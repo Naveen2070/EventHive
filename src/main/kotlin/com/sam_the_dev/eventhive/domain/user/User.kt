@@ -7,6 +7,7 @@ data class User(
     val username: String,
     val email: String,
     val password: String,
+    val roles: Set<String> = emptySet(),
     val createdBy: Long,
     val updatedBy: Long,
     val createdAt: Instant = Instant.now(),

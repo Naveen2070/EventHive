@@ -7,6 +7,7 @@ fun UserEntity.toDomain(): User = User(
     username = username,
     email = email,
     password = password,
+    roles = this.userRoles.map { it.role.name }.toSet(),
     createdBy = createdBy,
     updatedBy = updatedBy,
     createdAt = createdAt,

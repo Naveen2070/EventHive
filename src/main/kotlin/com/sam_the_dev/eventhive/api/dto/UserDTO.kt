@@ -6,6 +6,7 @@ data class UserDTO(
     val id: Long?,
     val username: String,
     val email: String,
+    val roles: Set<String>,
     val createdBy: Long,
     val updatedBy: Long,
     val createdAt: Instant,

@@ -28,8 +28,13 @@ class JwtService {
         extraClaims: Map<String, Any>,
         userDetails: UserDetails
     ): String {
+        val roles = userDetails.authorities.map { it.authority }
+
+        val combinedClaims = extraClaims + mapOf(
+            "roles" to roles
+        )
         return Jwts.builder()
-            .claims(extraClaims)
+            .claims(combinedClaims)
             .subject(userDetails.username)
             .issuedAt(Date(System.currentTimeMillis()))
             .expiration(Date(System.currentTimeMillis() + expirationMs))

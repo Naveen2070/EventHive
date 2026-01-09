@@ -23,9 +23,9 @@ class CustomUserDetailsService(
         // Map Roles (if you have them) to Authorities
         // Note: Assuming your UserEntity has a 'roles' relationship.
         // If not, we pass an empty list for now or a default "ROLE_USER"
-        val authorities = listOf(
-            SimpleGrantedAuthority("ROLE_USER")
-        ).toSet()
+        val authorities = userEntity.userRoles.map { userRole ->
+            SimpleGrantedAuthority("ROLE_${userRole.role.name}")
+        }.toSet()
 
         // Return the Spring Security User object
         return User(

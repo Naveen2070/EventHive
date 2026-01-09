@@ -6,6 +6,7 @@ fun User.toDTO(): UserDTO = UserDTO(
     id = id,
     username = username,
     email = email,
+    roles = roles,
     createdBy = createdBy,
     updatedBy = updatedBy,
     createdAt = createdAt,
