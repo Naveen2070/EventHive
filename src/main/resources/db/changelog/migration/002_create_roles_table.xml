@@ -35,13 +35,19 @@
 
         <!-- Seed roles -->
         <insert tableName="roles">
-            <column name="name" value="USER"/>
+            <column name="name" value="SUPER_ADMIN"/>
             <column name="created_by" valueNumeric="0"/>
             <column name="updated_by" valueNumeric="0"/>
         </insert>
 
         <insert tableName="roles">
             <column name="name" value="ADMIN"/>
+            <column name="created_by" valueNumeric="0"/>
+            <column name="updated_by" valueNumeric="0"/>
+        </insert>
+
+        <insert tableName="roles">
+            <column name="name" value="USER"/>
             <column name="created_by" valueNumeric="0"/>
             <column name="updated_by" valueNumeric="0"/>
         </insert>
