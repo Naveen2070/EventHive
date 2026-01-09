@@ -1,6 +1,6 @@
 package com.sam_the_dev.eventhive.application.user
 
-import com.sam_the_dev.eventhive.api.dto.RegisterUserDto
+import com.sam_the_dev.eventhive.api.dto.RegisterUserDTO
 import com.sam_the_dev.eventhive.api.dto.UserDTO
 import com.sam_the_dev.eventhive.api.mapper.toDTO
 import com.sam_the_dev.eventhive.application.user.error.UserAlreadyExistsException
@@ -21,7 +21,7 @@ class UserServiceImpl(
 ): UserService {
     private val logger = LoggerFactory.getLogger(UserServiceImpl::class.java)
 
-    override fun registerUser(user: RegisterUserDto): UserDTO {
+    override fun registerUser(user: RegisterUserDTO): UserDTO {
             // Check if user with username or email already exists
             val existingUser = userRepository.findByUsernameOrEmail(user.username, user.email)
             if (existingUser != null) {

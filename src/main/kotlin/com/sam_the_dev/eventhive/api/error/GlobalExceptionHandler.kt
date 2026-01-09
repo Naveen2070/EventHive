@@ -1,5 +1,8 @@
 package com.sam_the_dev.eventhive.api.error
 
+import com.sam_the_dev.eventhive.application.auth.error.InvalidCredentialsException
+import com.sam_the_dev.eventhive.application.auth.error.TokenExpiredException
+import com.sam_the_dev.eventhive.application.auth.error.UnauthorizedUserException
 import com.sam_the_dev.eventhive.application.user.error.UserAlreadyExistsException
 import com.sam_the_dev.eventhive.application.user.error.UserNotFoundException
 
@@ -44,7 +47,28 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.BAD_REQUEST)
     }
 
-    // 3. Handle Everything Else (500)
+    // 3. Handle Authentication Errors (401)
+    @ExceptionHandler(
+        InvalidCredentialsException::class,
+        TokenExpiredException::class,
+        UnauthorizedUserException::class
+    )
+    fun handleInvalidCredentials(
+        ex: RuntimeException,
+        request: WebRequest
+    ): ResponseEntity<ApiErrorResponse> {
+
+        val errorResponse = ApiErrorResponse(
+            status = HttpStatus.UNAUTHORIZED.value(),
+            error = HttpStatus.UNAUTHORIZED.reasonPhrase,
+            message = ex.message ?: "Authentication failed",
+            path = request.getDescription(false).replace("uri=", "")
+        )
+
+        return ResponseEntity(errorResponse, HttpStatus.UNAUTHORIZED)
+    }
+
+    // 4. Handle Everything Else (500)
     @ExceptionHandler(Exception::class)
     fun handleGlobalException(ex: Exception, request: WebRequest): ResponseEntity<ApiErrorResponse> {
         // Log the real error internally so you can debug it later
