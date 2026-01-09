@@ -1,0 +1,77 @@
+package com.sam_the_dev.eventhive.application.user
+
+import com.sam_the_dev.eventhive.api.dto.RegisterUserDto
+import com.sam_the_dev.eventhive.api.dto.UserDTO
+import com.sam_the_dev.eventhive.api.mapper.toDTO
+import com.sam_the_dev.eventhive.application.user.error.UserAlreadyExistsException
+import com.sam_the_dev.eventhive.application.user.error.UserNotFoundException
+import com.sam_the_dev.eventhive.domain.user.User
+import com.sam_the_dev.eventhive.domain.user.UserService
+import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserRepository
+import com.sam_the_dev.eventhive.infrastructure.persistence.user.toDomain
+import com.sam_the_dev.eventhive.infrastructure.persistence.user.toEntity
+import org.slf4j.LoggerFactory
+import org.springframework.security.crypto.password.PasswordEncoder
+import org.springframework.stereotype.Service
+
+@Service
+class UserServiceImpl(
+    private val userRepository: UserRepository,
+    private val passwordEncoder: PasswordEncoder
+): UserService {
+    private val logger = LoggerFactory.getLogger(UserServiceImpl::class.java)
+
+    override fun registerUser(user: RegisterUserDto): UserDTO {
+            // Check if user with username or email already exists
+            val existingUser = userRepository.findByUsernameOrEmail(user.username, user.email)
+            if (existingUser != null) {
+                throw UserAlreadyExistsException("User with username or email already exists")
+            }
+
+            // Hash the password
+            val hashedPassword = passwordEncoder.encode(user.password)
+            // Create a new user
+            val newUser = User(
+                id = null,
+                username = user.username,
+                email = user.email,
+                password = hashedPassword,
+                createdBy = 0L,
+                updatedBy = 0L
+            )
+
+        try {
+            // Save the user to the database and return the saved user
+            val savedUser = userRepository.save(newUser.toEntity())
+            logger.info("User registered successfully: ${savedUser.username}")
+            return savedUser.toDomain().toDTO()
+        } catch (e: Exception) {
+            logger.error("Error registering user: ${e.message}")
+            throw Exception("Failed to register user")
+        }
+    }
+
+    override fun getUserById(id: Long): UserDTO {
+        return try {
+            userRepository.findById(id)
+                .orElseThrow { UserNotFoundException(id.toString(),"User not found with id=$id") }
+                .toDomain()
+                .toDTO()
+        } catch (e: RuntimeException) {
+            logger.error("Error getting user by id=$id", e)
+            throw e
+        }
+    }
+
+
+    override fun getUserByEmailOrUsername(uniqueId: String): User {
+         try {
+            val  user = userRepository.findByUsernameOrEmail(uniqueId,uniqueId)
+                ?: throw UserNotFoundException(uniqueId,"User not found with credentials =$uniqueId")
+            return user.toDomain()
+        } catch (e: RuntimeException) {
+            logger.error("Error getting user by credentials=$uniqueId", e)
+            throw e
+        }
+    }
+}

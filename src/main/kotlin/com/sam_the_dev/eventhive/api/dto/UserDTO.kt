@@ -1,0 +1,16 @@
+package com.sam_the_dev.eventhive.api.dto
+
+import java.time.Instant
+
+data class UserDTO(
+    val id: Long?,
+    val username: String,
+    val email: String,
+    val createdBy: Long,
+    val updatedBy: Long,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+    val deletedAt: Instant?,
+    val isActive: Boolean,
+    val isDeleted: Boolean
+)

@@ -1,0 +1,61 @@
+package com.sam_the_dev.eventhive.api.error
+
+import com.sam_the_dev.eventhive.application.user.error.UserAlreadyExistsException
+import com.sam_the_dev.eventhive.application.user.error.UserNotFoundException
+
+import org.slf4j.LoggerFactory
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.ExceptionHandler
+import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.context.request.WebRequest
+
+@RestControllerAdvice
+class GlobalExceptionHandler {
+
+    // Initialize the logger
+    private val logger = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)
+
+    // 1. Handle "Not Found" (404)
+    @ExceptionHandler(
+        UserNotFoundException::class
+    )
+    fun handleNotFound(ex: RuntimeException, request: WebRequest): ResponseEntity<ApiErrorResponse> {
+        val errorResponse = ApiErrorResponse(
+            status = HttpStatus.NOT_FOUND.value(),
+            error = HttpStatus.NOT_FOUND.reasonPhrase,
+            message = ex.message ?: "Resource not found",
+            path = request.getDescription(false).replace("uri=", "")
+        )
+        return ResponseEntity(errorResponse, HttpStatus.NOT_FOUND)
+    }
+
+    // 2. Handle "Bad Request" (400)
+    @ExceptionHandler(
+        UserAlreadyExistsException::class
+    )
+    fun handleBadRequest(ex: RuntimeException, request: WebRequest): ResponseEntity<ApiErrorResponse> {
+        val errorResponse = ApiErrorResponse(
+            status = HttpStatus.BAD_REQUEST.value(),
+            error = HttpStatus.BAD_REQUEST.reasonPhrase,
+            message = ex.message ?: "Invalid request",
+            path = request.getDescription(false).replace("uri=", "")
+        )
+        return ResponseEntity(errorResponse, HttpStatus.BAD_REQUEST)
+    }
+
+    // 3. Handle Everything Else (500)
+    @ExceptionHandler(Exception::class)
+    fun handleGlobalException(ex: Exception, request: WebRequest): ResponseEntity<ApiErrorResponse> {
+        // Log the real error internally so you can debug it later
+         logger.error("Unexpected error", ex)
+
+        val errorResponse = ApiErrorResponse(
+            status = HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            error = HttpStatus.INTERNAL_SERVER_ERROR.reasonPhrase,
+            message = "An unexpected error occurred. Please try again later.",
+            path = request.getDescription(false).replace("uri=", "")
+        )
+        return ResponseEntity(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR)
+    }
+}

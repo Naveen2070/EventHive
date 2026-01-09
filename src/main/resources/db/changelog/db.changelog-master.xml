@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Users table -->
+    <include file="db/changelog/migration/001_create_users_table.xml"/>
+
+    <!-- Roles table -->
+    <include file="db/changelog/migration/002_create_roles_table.xml"/>
+
+    <!-- User roles mapping -->
+    <include file="db/changelog/migration/003_create_user_roles_table.xml"/>
+
+    <!-- Events table -->
+    <include file="db/changelog/migration/004_create_events_table.xml"/>
+
+    <!-- Bookings table -->
+    <include file="db/changelog/migration/005_create_bookings_table.xml"/>
+
+</databaseChangeLog>
