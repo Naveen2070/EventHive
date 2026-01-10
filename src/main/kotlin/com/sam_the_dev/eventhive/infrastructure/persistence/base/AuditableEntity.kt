@@ -17,6 +17,10 @@ abstract class AuditableEntity {
     var updatedAt: Instant = Instant.now()
         protected set
 
+    @Column(name = "deleted_by")
+    var deletedBy: Long ?= null
+        protected set
+
     @Column(name = "deleted_at")
     var deletedAt: Instant? = null
         protected set
@@ -40,9 +44,10 @@ abstract class AuditableEntity {
         updatedAt = Instant.now()
     }
 
-    fun markDeleted() {
+    fun markDeleted(deletedBy: Long) {
         isDeleted = true
         isActive = false
+        this.deletedBy = deletedBy
         deletedAt = Instant.now()
     }
 }

@@ -8,6 +8,7 @@ import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.AuthenticationProvider
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
@@ -18,6 +19,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 class SecurityConfig(
     private val userDetailsService: CustomUserDetailsService,
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
@@ -29,14 +31,18 @@ class SecurityConfig(
             .csrf { it.disable() } // Disable CSRF for REST APIs
             .authorizeHttpRequests { auth ->
                 auth
-                    // Allow Swagger UI and API Docs
+                    // ------------------------------- PUBLIC endpoints ----------------------------------
                     .requestMatchers(
                         "/v3/api-docs/**",
                         "/swagger-ui/**",
                         "/swagger-ui.html"
                     ).permitAll()
-                    // Allow Auth endpoints (Register/Login)
+                    // auth endpoint
                     .requestMatchers("/api/auth/**").permitAll()
+
+                    // ------------------------------- RESTRICTED endpoints -------------------------------
+                    .requestMatchers("/api/admin/**").hasAnyRole("SUPER_ADMIN", "ADMIN")
+
                     // Secure everything else
                     .anyRequest().authenticated()
             }

@@ -3,6 +3,7 @@ package com.sam_the_dev.eventhive.api.error
 import com.sam_the_dev.eventhive.application.auth.error.InvalidCredentialsException
 import com.sam_the_dev.eventhive.application.auth.error.TokenExpiredException
 import com.sam_the_dev.eventhive.application.auth.error.UnauthorizedUserException
+import com.sam_the_dev.eventhive.application.role.error.RoleNotFoundException
 import com.sam_the_dev.eventhive.application.user.error.UserAlreadyExistsException
 import com.sam_the_dev.eventhive.application.user.error.UserNotFoundException
 
@@ -21,7 +22,8 @@ class GlobalExceptionHandler {
 
     // 1. Handle "Not Found" (404)
     @ExceptionHandler(
-        UserNotFoundException::class
+        UserNotFoundException::class,
+        RoleNotFoundException::class
     )
     fun handleNotFound(ex: RuntimeException, request: WebRequest): ResponseEntity<ApiErrorResponse> {
         val errorResponse = ApiErrorResponse(

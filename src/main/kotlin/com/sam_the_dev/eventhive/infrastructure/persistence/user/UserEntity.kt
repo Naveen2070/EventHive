@@ -1,7 +1,6 @@
 package com.sam_the_dev.eventhive.infrastructure.persistence.user
 
 import com.sam_the_dev.eventhive.infrastructure.persistence.base.AuditableEntity
-import com.sam_the_dev.eventhive.infrastructure.persistence.role.RoleEntity
 import com.sam_the_dev.eventhive.infrastructure.persistence.role.UserRoleEntity
 import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
@@ -10,9 +9,6 @@ import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
-import jakarta.persistence.JoinColumn
-import jakarta.persistence.JoinTable
-import jakarta.persistence.ManyToMany
 import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 
@@ -21,7 +17,7 @@ import jakarta.persistence.Table
 class UserEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    val id: Long? =null,
 
     @Column(nullable = false, unique = true)
     var username: String,

@@ -1,9 +1,7 @@
 package com.sam_the_dev.eventhive.api.controller
 
-import com.sam_the_dev.eventhive.api.dto.RegisterUserDTO
 import com.sam_the_dev.eventhive.api.dto.UserDTO
 import com.sam_the_dev.eventhive.domain.user.UserService
-import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
