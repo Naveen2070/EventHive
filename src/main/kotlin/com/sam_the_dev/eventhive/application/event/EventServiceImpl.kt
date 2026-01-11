@@ -3,6 +3,7 @@ package com.sam_the_dev.eventhive.application.event
 import com.sam_the_dev.eventhive.api.dto.CreateEventRequest
 import com.sam_the_dev.eventhive.api.dto.EventDTO
 import com.sam_the_dev.eventhive.api.mapper.toDTO
+import com.sam_the_dev.eventhive.application.event.error.EventNotFoundException
 import com.sam_the_dev.eventhive.application.user.error.UserNotFoundException
 import com.sam_the_dev.eventhive.domain.event.EventService
 import com.sam_the_dev.eventhive.domain.event.EventStatus
@@ -11,6 +12,8 @@ import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventRepositor
 import com.sam_the_dev.eventhive.infrastructure.persistence.event.toDomain
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserRepository
 import org.slf4j.LoggerFactory
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -51,5 +54,19 @@ class EventServiceImpl(
             logger.error("Failed to create event: ${e.message}")
             throw RuntimeException("Failed to create event: ${e.message}")
         }
+    }
+
+    @Transactional(readOnly = true)
+    override fun getAllEvents(pageable: Pageable): Page<EventDTO> {
+        return eventRepository.findAll(pageable)
+            .map { it.toDomain().toDTO() }
+    }
+
+    @Transactional(readOnly = true)
+    override fun getEventById(id: Long): EventDTO{
+        val event = eventRepository.findById(id)
+            .orElseThrow { EventNotFoundException("Event not found with ID: $id") }
+
+        return event.toDomain().toDTO()
     }
 }

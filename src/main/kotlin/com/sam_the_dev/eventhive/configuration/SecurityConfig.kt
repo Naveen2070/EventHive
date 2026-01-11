@@ -4,6 +4,7 @@ import com.sam_the_dev.eventhive.infrastructure.security.CustomUserDetailsServic
 import com.sam_the_dev.eventhive.infrastructure.security.JwtAuthenticationFilter
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpMethod
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.AuthenticationProvider
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider
@@ -39,9 +40,21 @@ class SecurityConfig(
                     ).permitAll()
                     // auth endpoint
                     .requestMatchers("/api/auth/**").permitAll()
+                    // events public endpoints
+                    .requestMatchers(HttpMethod.GET, "/api/events/**").permitAll()
 
                     // ------------------------------- RESTRICTED endpoints -------------------------------
                     .requestMatchers("/api/admin/**").hasAnyRole("SUPER_ADMIN", "ADMIN")
+
+                    // Explicitly requiring authentication at the security filter level for
+                    // write operations on /api/events/** (POST/PUT/DELETE/PATCH).
+                    // Although fine-grained authorization is handled in controllers via
+                    // @PreAuthorize, these matchers act as a first security gate to ensure
+                    // requests are authenticated before reaching controller logic (defense-in-depth).
+                    .requestMatchers(HttpMethod.POST, "/api/events/**").authenticated()
+                    .requestMatchers(HttpMethod.PUT, "/api/events/**").authenticated()
+                    .requestMatchers(HttpMethod.DELETE, "/api/events/**").authenticated()
+                    .requestMatchers(HttpMethod.PATCH, "/api/events/**").authenticated()
 
                     // Secure everything else
                     .anyRequest().authenticated()

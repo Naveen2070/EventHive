@@ -3,6 +3,9 @@ package com.sam_the_dev.eventhive.api.controller
 import com.sam_the_dev.eventhive.api.dto.CreateEventRequest
 import com.sam_the_dev.eventhive.api.dto.EventDTO
 import com.sam_the_dev.eventhive.domain.event.EventService
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
@@ -21,5 +24,19 @@ class EventController(
     ): ResponseEntity<EventDTO> {
         val response = eventService.createEvent(request)
         return ResponseEntity(response, HttpStatus.CREATED)
+    }
+
+    @GetMapping
+    fun getAllEvents(
+        @PageableDefault(size = 10, sort = ["startDate"]) pageable: Pageable
+    ): ResponseEntity<Page<EventDTO>> {
+        val events = eventService.getAllEvents(pageable)
+        return ResponseEntity.ok(events)
+    }
+
+    @GetMapping("/{id}")
+    fun getEventById(@PathVariable id: Long): ResponseEntity<EventDTO> {
+        val event = eventService.getEventById(id)
+        return ResponseEntity.ok(event)
     }
 }

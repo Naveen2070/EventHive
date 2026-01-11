@@ -15,6 +15,7 @@ import com.sam_the_dev.eventhive.infrastructure.persistence.user.toEntity
 import org.slf4j.LoggerFactory
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 @Service
 class UserServiceImpl(
@@ -24,6 +25,7 @@ class UserServiceImpl(
 ) : UserService {
     private val logger = LoggerFactory.getLogger(UserServiceImpl::class.java)
 
+    @Transactional
     override fun registerUser(user: RegisterUserDTO): UserDTO {
         // Check if user with username or email already exists
         val existingUser = userRepository.findByUsernameOrEmail(user.username, user.email)
@@ -72,6 +74,7 @@ class UserServiceImpl(
         }
     }
 
+    @Transactional(readOnly = true)
     override fun getUserById(id: Long): UserDTO {
         return try {
             userRepository.findById(id)
@@ -85,6 +88,7 @@ class UserServiceImpl(
     }
 
 
+    @Transactional(readOnly = true)
     override fun getUserByEmailOrUsername(uniqueId: String): User {
         try {
             val user = userRepository.findByUsernameOrEmail(uniqueId, uniqueId)
