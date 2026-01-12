@@ -4,7 +4,7 @@ import com.sam_the_dev.eventhive.api.dto.EventDTO
 import com.sam_the_dev.eventhive.domain.event.Event
 
 fun Event.toDTO(): EventDTO = EventDTO(
-    id = id,
+    id = id ?: 0,
     title = title,
     description = description,
     startDate = startDate,

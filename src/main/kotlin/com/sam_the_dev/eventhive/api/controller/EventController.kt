@@ -2,8 +2,9 @@ package com.sam_the_dev.eventhive.api.controller
 
 import com.sam_the_dev.eventhive.api.dto.CreateEventRequest
 import com.sam_the_dev.eventhive.api.dto.EventDTO
+import com.sam_the_dev.eventhive.api.dto.PaginatedResponse
+import com.sam_the_dev.eventhive.api.dto.toPaginatedResponse
 import com.sam_the_dev.eventhive.domain.event.EventService
-import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpStatus
@@ -29,9 +30,9 @@ class EventController(
     @GetMapping
     fun getAllEvents(
         @PageableDefault(size = 10, sort = ["startDate"]) pageable: Pageable
-    ): ResponseEntity<Page<EventDTO>> {
-        val events = eventService.getAllEvents(pageable)
-        return ResponseEntity.ok(events)
+    ):  ResponseEntity<PaginatedResponse<EventDTO>> {
+        val page = eventService.getAllEvents(pageable)
+        return ResponseEntity.ok(page.toPaginatedResponse())
     }
 
     @GetMapping("/{id}")

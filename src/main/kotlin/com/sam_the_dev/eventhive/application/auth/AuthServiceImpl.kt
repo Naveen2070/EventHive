@@ -4,7 +4,7 @@ import com.sam_the_dev.eventhive.api.dto.AuthResponse
 import com.sam_the_dev.eventhive.api.dto.LoginRequest
 import com.sam_the_dev.eventhive.api.dto.RegisterUserDTO
 import com.sam_the_dev.eventhive.api.dto.UserDTO
-import com.sam_the_dev.eventhive.application.auth.error.InvalidCredentialsException
+import com.sam_the_dev.eventhive.domain.auth.error.InvalidCredentialsException
 import com.sam_the_dev.eventhive.domain.auth.AuthService
 import com.sam_the_dev.eventhive.domain.user.UserService
 import com.sam_the_dev.eventhive.infrastructure.security.JwtService

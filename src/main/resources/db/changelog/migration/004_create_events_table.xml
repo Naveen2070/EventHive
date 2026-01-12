@@ -6,7 +6,8 @@
            http://www.liquibase.org/xml/ns/dbchangelog
            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
 
-    <changeSet id="004" author="you">
+    <changeSet id="004" author="naveen" labels="initial-migration">
+        <comment>Initial migration for events table</comment>
         <createTable tableName="events">
             <column name="id" type="BIGINT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>

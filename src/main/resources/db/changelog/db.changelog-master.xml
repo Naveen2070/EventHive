@@ -19,4 +19,7 @@
     <!-- Bookings table -->
     <include file="db/changelog/migration/005_create_bookings_table.xml"/>
 
+    <!-- Field Changes -->
+    <include file="db/changelog/migration/006_add_version_columns.xml"/>
+
 </databaseChangeLog>

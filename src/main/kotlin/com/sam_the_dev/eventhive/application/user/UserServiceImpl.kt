@@ -3,8 +3,8 @@ package com.sam_the_dev.eventhive.application.user
 import com.sam_the_dev.eventhive.api.dto.RegisterUserDTO
 import com.sam_the_dev.eventhive.api.dto.UserDTO
 import com.sam_the_dev.eventhive.api.mapper.toDTO
-import com.sam_the_dev.eventhive.application.user.error.UserAlreadyExistsException
-import com.sam_the_dev.eventhive.application.user.error.UserNotFoundException
+import com.sam_the_dev.eventhive.domain.user.error.UserAlreadyExistsException
+import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
 import com.sam_the_dev.eventhive.domain.user.User
 import com.sam_the_dev.eventhive.domain.user.UserService
 import com.sam_the_dev.eventhive.infrastructure.persistence.role.RoleRepository

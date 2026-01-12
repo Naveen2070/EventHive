@@ -1,11 +1,12 @@
 package com.sam_the_dev.eventhive.api.error
 
-import com.sam_the_dev.eventhive.application.auth.error.InvalidCredentialsException
-import com.sam_the_dev.eventhive.application.auth.error.TokenExpiredException
-import com.sam_the_dev.eventhive.application.auth.error.UnauthorizedUserException
-import com.sam_the_dev.eventhive.application.role.error.RoleNotFoundException
-import com.sam_the_dev.eventhive.application.user.error.UserAlreadyExistsException
-import com.sam_the_dev.eventhive.application.user.error.UserNotFoundException
+import com.sam_the_dev.eventhive.domain.auth.error.InvalidCredentialsException
+import com.sam_the_dev.eventhive.domain.auth.error.TokenExpiredException
+import com.sam_the_dev.eventhive.domain.auth.error.UnauthorizedUserException
+import com.sam_the_dev.eventhive.domain.event.error.EventNotFoundException
+import com.sam_the_dev.eventhive.domain.role.error.RoleNotFoundException
+import com.sam_the_dev.eventhive.domain.user.error.UserAlreadyExistsException
+import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
 
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -23,7 +24,8 @@ class GlobalExceptionHandler {
     // 1. Handle "Not Found" (404)
     @ExceptionHandler(
         UserNotFoundException::class,
-        RoleNotFoundException::class
+        RoleNotFoundException::class,
+        EventNotFoundException::class
     )
     fun handleNotFound(ex: RuntimeException, request: WebRequest): ResponseEntity<ApiErrorResponse> {
         val errorResponse = ApiErrorResponse(

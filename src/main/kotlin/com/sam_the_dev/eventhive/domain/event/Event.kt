@@ -6,7 +6,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 
 data class Event(
-    val id: Long,
+    val id: Long?,
     val title: String,
     val description: String,
     val startDate: LocalDateTime,

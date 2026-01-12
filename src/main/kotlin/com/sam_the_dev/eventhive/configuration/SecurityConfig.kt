@@ -61,7 +61,7 @@ class SecurityConfig(
             }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authenticationProvider(authenticationProvider())
-                // Add JWT filter before UsernamePasswordAuthenticationFilter
+            // Add JWT filter before UsernamePasswordAuthenticationFilter
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
 
         return http.build()

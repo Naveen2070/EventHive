@@ -2,8 +2,8 @@ package com.sam_the_dev.eventhive.application.role
 
 import com.sam_the_dev.eventhive.api.dto.UserDTO
 import com.sam_the_dev.eventhive.api.mapper.toDTO
-import com.sam_the_dev.eventhive.application.role.error.RoleNotFoundException
-import com.sam_the_dev.eventhive.application.user.error.UserNotFoundException
+import com.sam_the_dev.eventhive.domain.role.error.RoleNotFoundException
+import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
 import com.sam_the_dev.eventhive.domain.role.RoleService
 import com.sam_the_dev.eventhive.infrastructure.persistence.role.RoleRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.role.UserRoleEntity

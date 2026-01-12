@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+           http://www.liquibase.org/xml/ns/dbchangelog
+           http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+            <changeSet id="006" author="naveen" labels="versioning,optimistic-lock">
+                <preConditions onFail="MARK_RAN">
+                    <and>
+                        <not>
+                            <columnExists tableName="app_users" columnName="version"/>
+                        </not>
+                        <not>
+                            <columnExists tableName="roles" columnName="version"/>
+                        </not>
+                        <not>
+                            <columnExists tableName="user_roles" columnName="version"/>
+                        </not>
+                        <not>
+                            <columnExists tableName="events" columnName="version"/>
+                        </not>
+                        <not>
+                            <columnExists tableName="bookings" columnName="version"/>
+                        </not>
+                    </and>
+                </preConditions>
+                <comment>Add version columns for optimistic locking</comment>
+                <addColumn tableName="app_users">
+                    <column name="version" type="BIGINT" defaultValueNumeric="0">
+                        <constraints nullable="false"/>
+                    </column>
+                </addColumn>
+
+                <addColumn tableName="roles">
+                    <column name="version" type="BIGINT" defaultValueNumeric="0">
+                        <constraints nullable="false"/>
+                    </column>
+                </addColumn>
+
+                <addColumn tableName="user_roles">
+                    <column name="version" type="BIGINT" defaultValueNumeric="0">
+                        <constraints nullable="false"/>
+                    </column>
+                </addColumn>
+
+                <addColumn tableName="events">
+                    <column name="version" type="BIGINT" defaultValueNumeric="0">
+                        <constraints nullable="false"/>
+                    </column>
+                </addColumn>
+
+                <addColumn tableName="bookings">
+                    <column name="version" type="BIGINT" defaultValueNumeric="0">
+                        <constraints nullable="false"/>
+                    </column>
+                </addColumn>
+            </changeSet>
+
+</databaseChangeLog>

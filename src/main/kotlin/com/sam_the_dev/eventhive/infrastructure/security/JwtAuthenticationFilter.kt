@@ -1,11 +1,9 @@
 package com.sam_the_dev.eventhive.infrastructure.security
 
-import com.sam_the_dev.eventhive.application.auth.error.TokenExpiredException
 import io.jsonwebtoken.ExpiredJwtException
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
-import org.slf4j.LoggerFactory
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.core.userdetails.UserDetailsService

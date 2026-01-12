@@ -3,8 +3,8 @@ package com.sam_the_dev.eventhive.application.event
 import com.sam_the_dev.eventhive.api.dto.CreateEventRequest
 import com.sam_the_dev.eventhive.api.dto.EventDTO
 import com.sam_the_dev.eventhive.api.mapper.toDTO
-import com.sam_the_dev.eventhive.application.event.error.EventNotFoundException
-import com.sam_the_dev.eventhive.application.user.error.UserNotFoundException
+import com.sam_the_dev.eventhive.domain.event.error.EventNotFoundException
+import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
 import com.sam_the_dev.eventhive.domain.event.EventService
 import com.sam_the_dev.eventhive.domain.event.EventStatus
 import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventEntity

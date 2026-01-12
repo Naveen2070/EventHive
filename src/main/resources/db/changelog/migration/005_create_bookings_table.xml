@@ -6,50 +6,71 @@
            http://www.liquibase.org/xml/ns/dbchangelog
            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
 
-        <changeSet id="005" author="you">
-            <createTable tableName="bookings">
-                <column name="id" type="BIGINT" autoIncrement="true">
-                    <constraints primaryKey="true" nullable="false" primaryKeyName="pk_bookings"/>
-                </column>
-                <column name="user_id" type="BIGINT">
-                    <constraints nullable="false"/>
-                </column>
-                <column name="event_id" type="BIGINT">
-                    <constraints nullable="false"/>
-                </column>
-                <column name="status" type="VARCHAR(50)">
-                    <constraints nullable="false"/>
-                </column>
+    <changeSet id="005" author="naveen" labels="initial-migration">
+        <comment>Initial migration for bookings table</comment>
+        <createTable tableName="bookings">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_bookings"/>
+            </column>
 
-                <column name="created_by" type="BIGINT">
-                    <constraints nullable="false"/>
-                </column>
-                <column name="updated_by" type="BIGINT">
-                    <constraints nullable="false"/>
-                </column>
-                <column name="deleted_by" type="BIGINT">
-                    <constraints nullable="true"/>
-                </column>
-                <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
-                    <constraints nullable="false"/>
-                </column>
-                <column name="is_deleted" type="BOOLEAN" defaultValueBoolean="false">
-                    <constraints nullable="false"/>
-                </column>
-                <column name="created_at" type="TIMESTAMP" defaultValueDate="CURRENT_TIMESTAMP"/>
-                <column name="updated_at" type="TIMESTAMP" defaultValueDate="CURRENT_TIMESTAMP"/>
-                <column name="deleted_at" type="TIMESTAMP"/>
-            </createTable>
+            <column name="booking_reference" type="VARCHAR(64)">
+                <constraints nullable="false" unique="true"/>
+            </column>
 
-            <!-- Foreign keys with names -->
-            <addForeignKeyConstraint baseTableName="bookings" baseColumnNames="user_id"
-                                     referencedTableName="app_users" referencedColumnNames="id"
-                                     constraintName="fk_bookings_user"
-                                     onDelete="CASCADE"/>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="event_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
 
-            <addForeignKeyConstraint baseTableName="bookings" baseColumnNames="event_id"
-                                     referencedTableName="events" referencedColumnNames="id"
-                                     constraintName="fk_bookings_event"
-                                     onDelete="CASCADE"/>
-        </changeSet>
+            <column name="tickets_count" type="INT">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="total_price" type="DECIMAL(10, 2)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="status" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="created_by" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_by" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_by" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_deleted" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP" defaultValueDate="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" type="TIMESTAMP" defaultValueDate="CURRENT_TIMESTAMP"/>
+            <column name="deleted_at" type="TIMESTAMP"/>
+        </createTable>
+
+        <addForeignKeyConstraint baseTableName="bookings" baseColumnNames="user_id"
+                                 referencedTableName="app_users" referencedColumnNames="id"
+                                 constraintName="fk_bookings_user"
+                                 onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint baseTableName="bookings" baseColumnNames="event_id"
+                                 referencedTableName="events" referencedColumnNames="id"
+                                 constraintName="fk_bookings_event"
+                                 onDelete="CASCADE"/>
+
+        <createIndex tableName="bookings" indexName="idx_bookings_user">
+            <column name="user_id"/>
+        </createIndex>
+        <createIndex tableName="bookings" indexName="idx_bookings_event">
+            <column name="event_id"/>
+        </createIndex>
+    </changeSet>
 </databaseChangeLog>

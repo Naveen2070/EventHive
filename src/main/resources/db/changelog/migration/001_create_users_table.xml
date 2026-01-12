@@ -4,7 +4,8 @@
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
 
-        <changeSet id="001" author="you">
+        <changeSet id="001" author="naveen" labels="initial-migration">
+            <comment>Initial migration for app_users table</comment>
             <createTable tableName="app_users">
                 <column name="id" type="BIGINT" autoIncrement="true" >
                         <constraints primaryKey="true" nullable="false" />

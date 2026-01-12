@@ -1,20 +1,17 @@
 package com.sam_the_dev.eventhive.infrastructure.persistence.base
 
-import jakarta.persistence.Column
-import jakarta.persistence.MappedSuperclass
-import jakarta.persistence.PrePersist
-import jakarta.persistence.PreUpdate
+import jakarta.persistence.*
 import java.time.Instant
 
 @MappedSuperclass
 abstract class AuditableEntity {
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    var createdAt: Instant = Instant.now()
+    lateinit var createdAt: Instant
         protected set
 
     @Column(name = "updated_at", nullable = false)
-    var updatedAt: Instant = Instant.now()
+    lateinit var updatedAt: Instant
         protected set
 
     @Column(name = "deleted_by")
@@ -31,6 +28,11 @@ abstract class AuditableEntity {
 
     @Column(name = "is_deleted", nullable = false)
     var isDeleted: Boolean = false
+        protected set
+
+    @Version
+    @Column(name = "version", nullable = false)
+    var version: Long = 0
         protected set
 
     @PrePersist
