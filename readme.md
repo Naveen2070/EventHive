@@ -1,0 +1,133 @@
+# EventHive - Event Management System 🐝
+
+> A robust, scalable, and concurrency-safe backend for managing events and ticket bookings, built with **Kotlin** and **Spring Boot 3**.
+
+EventHive is a production-grade REST API designed to handle the core operations of an event ticketing platform. It features secure authentication, role-based access control, and a high-performance booking system capable of handling concurrent requests without data inconsistencies.
+
+---
+
+## 🚀 Key Features
+
+* **🔒 Secure Authentication:** JWT-based stateless authentication with custom security filters.
+* **👤 Role-Based Access Control (RBAC):** Granular permissions for `USER`, `ORGANIZER`, and `ADMIN` roles.
+* **⚡ Concurrency-Safe Booking:** Implements **Optimistic Locking** (`@Version`) to prevent "Lost Update" problems during high-traffic ticket sales.
+* **🔄 Automatic Retries:** Uses Spring Retry to seamlessly handle race conditions without user intervention.
+* **🏛️ Clean Architecture:** Separation of concerns using Domain-Driven Design (DDD) principles (Entity ↔ Domain ↔ DTO).
+* **🗄️ Database Migrations:** Managed schema evolution using **Liquibase** XML changelogs.
+* **📝 Audit System:** Automatic tracking of `created_by`, `updated_by`, and soft-delete capabilities.
+
+---
+
+## 🛠️ Tech Stack
+
+* **Language:** Kotlin (JDK 21)
+* **Framework:** Spring Boot 3.5+
+* **Database:** PostgreSQL
+* **ORM:** Spring Data JPA (Hibernate)
+* **Migration:** Liquibase
+* **Security:** Spring Security 6 + JWT (JJWT)
+* **Build Tool:** Gradle (Kotlin DSL)
+
+---
+
+## 🏗️ Architecture
+
+The project follows a **Hexagonal / Clean Architecture** approach to ensure maintainability and testability:
+
+```text
+src/main/kotlin/com/sam_the_dev/eventhive
+├── api                 # Presentation Layer (Controllers, DTOs)
+├── application         # Application Layer (Service Implementations, Use Cases)
+├── domain              # Domain Layer (Business Logic, Interfaces, Models)
+├── infrastructure      # Infrastructure Layer (Persistence, Security, Config)
+└── configuration       # Spring Configuration (Beans, Security Config)
+
+```
+
+---
+
+## ⚙️ Getting Started
+
+### Prerequisites
+
+* Java 21 or higher
+* Docker (for PostgreSQL)
+* Git
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/Naveen2070/EventHive.git
+cd EventHive
+
+```
+
+### 2. Configure Database
+
+You can spin up a PostgreSQL instance quickly using Docker:
+
+```bash
+docker run --name eventhive-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=event_hive_db -p 5432:5432 -d postgres
+
+```
+
+*Or update `src/main/resources/application.properties` with your local credentials.*
+
+### 3. Run the Application
+
+```bash
+./gradlew bootRun
+
+```
+
+*Liquibase will automatically create the tables (`app_users`, `roles`, `events`, `bookings`) on startup.*
+
+---
+
+## 🔌 API Endpoints
+
+### Authentication
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| `POST` | `/api/auth/register` | Register a new user | Public |
+| `POST` | `/api/auth/login` | Login and receive JWT | Public |
+
+### Events
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| `GET` | `/api/events` | Browse all events (Paginated) | Public |
+| `POST` | `/api/events` | Create a new event | `ORGANIZER`, `ADMIN` |
+
+### Bookings (Concurrency Safe)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| `POST` | `/api/bookings` | Book tickets | Authenticated User |
+
+### Admin
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| `PUT` | `/api/admin/users/{id}/roles` | Promote user roles | `ADMIN` |
+
+---
+
+## 🧪 Testing Concurrency
+
+The booking system is designed to handle race conditions.
+
+1. Set `available_seats = 1`.
+2. Send two simultaneous requests to `/api/bookings` from different users.
+3. **Result:** One succeeds, the other automatically retries (via `@Retryable`) and fails gracefully with "Not enough seats" instead of a system crash.
+
+---
+
+## 📜 License
+
+This project is licensed under the MIT License.
+
+---
+
+**Built with ❤️ by sam_the_dev**
