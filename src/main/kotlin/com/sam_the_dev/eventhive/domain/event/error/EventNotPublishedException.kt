@@ -1,6 +1,6 @@
 package com.sam_the_dev.eventhive.domain.event.error
 
 class EventNotPublishedException(
-    eventId: Long,
-    message:String = "Event $eventId is not published",
+    eventName: String,
+    message:String = "Event $eventName is not published",
 ) : RuntimeException(message)

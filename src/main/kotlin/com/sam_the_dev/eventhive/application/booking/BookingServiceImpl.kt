@@ -54,10 +54,10 @@ class BookingServiceImpl(
 
         // 3. Domain Logic Checks
         if (eventEntity.status != EventStatus.PUBLISHED) {
-            throw EventNotPublishedException(eventEntity.id!!)
+            throw EventNotPublishedException(eventEntity.title)
         }
         if (eventEntity.startDate.isBefore(LocalDateTime.now())) {
-            throw EventAlreadyStartedException(eventEntity.id!!)
+            throw EventAlreadyStartedException(eventEntity.title)
         }
 
         // 4. Check Availability (The logic that might fail concurrently)

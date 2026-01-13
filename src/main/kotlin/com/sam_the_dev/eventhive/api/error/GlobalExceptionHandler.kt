@@ -3,7 +3,10 @@ package com.sam_the_dev.eventhive.api.error
 import com.sam_the_dev.eventhive.domain.auth.error.InvalidCredentialsException
 import com.sam_the_dev.eventhive.domain.auth.error.TokenExpiredException
 import com.sam_the_dev.eventhive.domain.auth.error.UnauthorizedUserException
+import com.sam_the_dev.eventhive.domain.booking.error.InsufficientSeatsException
+import com.sam_the_dev.eventhive.domain.event.error.EventAlreadyStartedException
 import com.sam_the_dev.eventhive.domain.event.error.EventNotFoundException
+import com.sam_the_dev.eventhive.domain.event.error.EventNotPublishedException
 import com.sam_the_dev.eventhive.domain.role.error.RoleNotFoundException
 import com.sam_the_dev.eventhive.domain.user.error.UserAlreadyExistsException
 import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
@@ -72,7 +75,28 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.UNAUTHORIZED)
     }
 
-    // 4. Handle Everything Else (500)
+    // 4. Handle Business Rule Conflicts (409)
+    @ExceptionHandler(
+        EventNotPublishedException::class,
+        EventAlreadyStartedException::class,
+        InsufficientSeatsException::class
+    )
+    fun handleConflict(
+        ex: RuntimeException,
+        request: WebRequest
+    ): ResponseEntity<ApiErrorResponse> {
+
+        val errorResponse = ApiErrorResponse(
+            status = HttpStatus.CONFLICT.value(),
+            error = HttpStatus.CONFLICT.reasonPhrase,
+            message = ex.message ?: "Request conflicts with current resource state",
+            path = request.getDescription(false).replace("uri=", "")
+        )
+
+        return ResponseEntity(errorResponse, HttpStatus.CONFLICT)
+    }
+
+    // 5. Handle Everything Else (500)
     @ExceptionHandler(Exception::class)
     fun handleGlobalException(ex: Exception, request: WebRequest): ResponseEntity<ApiErrorResponse> {
         // Log the real error internally so you can debug it later
