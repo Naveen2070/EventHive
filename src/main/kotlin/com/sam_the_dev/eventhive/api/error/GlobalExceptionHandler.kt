@@ -4,13 +4,10 @@ import com.sam_the_dev.eventhive.domain.auth.error.InvalidCredentialsException
 import com.sam_the_dev.eventhive.domain.auth.error.TokenExpiredException
 import com.sam_the_dev.eventhive.domain.auth.error.UnauthorizedUserException
 import com.sam_the_dev.eventhive.domain.booking.error.InsufficientSeatsException
-import com.sam_the_dev.eventhive.domain.event.error.EventAlreadyStartedException
-import com.sam_the_dev.eventhive.domain.event.error.EventNotFoundException
-import com.sam_the_dev.eventhive.domain.event.error.EventNotPublishedException
+import com.sam_the_dev.eventhive.domain.event.error.*
 import com.sam_the_dev.eventhive.domain.role.error.RoleNotFoundException
 import com.sam_the_dev.eventhive.domain.user.error.UserAlreadyExistsException
 import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
-
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -75,11 +72,32 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.UNAUTHORIZED)
     }
 
-    // 4. Handle Business Rule Conflicts (409)
+    // 4. Handle Forbidden Errors (403)
+    @ExceptionHandler(
+        UnauthorizedEventAccessException::class
+    )
+    fun handleUnauthorizedAccess(
+        ex: RuntimeException,
+        request: WebRequest
+    ): ResponseEntity<ApiErrorResponse> {
+        val errorResponse = ApiErrorResponse(
+            status = HttpStatus.FORBIDDEN.value(),
+            error = HttpStatus.FORBIDDEN.reasonPhrase,
+            message = ex.message ?: "Access denied",
+            path = request.getDescription(false).replace("uri=", "")
+        )
+
+        return ResponseEntity(errorResponse, HttpStatus.FORBIDDEN)
+    }
+
+    // 5. Handle Business Rule Conflicts (409)
     @ExceptionHandler(
         EventNotPublishedException::class,
         EventAlreadyStartedException::class,
-        InsufficientSeatsException::class
+        InsufficientSeatsException::class,
+        InsufficientSeatCapacityException::class,
+        EventDateChangeNotAllowedException::class,
+        EventModificationNotAllowedException::class
     )
     fun handleConflict(
         ex: RuntimeException,
@@ -96,7 +114,7 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.CONFLICT)
     }
 
-    // 5. Handle Everything Else (500)
+    // 6. Handle Everything Else (500)
     @ExceptionHandler(Exception::class)
     fun handleGlobalException(ex: Exception, request: WebRequest): ResponseEntity<ApiErrorResponse> {
         // Log the real error internally so you can debug it later
