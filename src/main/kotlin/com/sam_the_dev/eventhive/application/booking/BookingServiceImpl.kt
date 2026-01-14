@@ -20,6 +20,8 @@ import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.toDomain
 import org.slf4j.LoggerFactory
 import org.springframework.dao.OptimisticLockingFailureException
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.retry.annotation.Backoff
 import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Service
@@ -102,6 +104,21 @@ class BookingServiceImpl(
         }catch (e: Exception){
             logger.error("Failed to save booking: ${e.message}")
             throw RuntimeException("Failed to save booking: ${e.message}")
+        }
+    }
+
+    @Transactional(readOnly = true)
+    override fun getMyBookings(userEmail: String, pageable: Pageable): Page<BookingDTO> {
+        // 1. Get the User ID from the email
+        val user = userRepository.findByUsernameOrEmail(userEmail, userEmail)
+            ?: throw UserNotFoundException(userEmail, "User not found")
+
+        // 2. Fetch Bookings from Repository
+        val bookingsPage = bookingRepository.findByUserId(user.id!!, pageable)
+
+        // 3. Map Entity -> DTO
+        return bookingsPage.map {
+            booking -> booking.toDomain().toDTO()
         }
     }
 }
