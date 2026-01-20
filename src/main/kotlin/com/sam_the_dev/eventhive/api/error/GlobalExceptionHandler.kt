@@ -4,6 +4,7 @@ import com.sam_the_dev.eventhive.domain.auth.error.InvalidCredentialsException
 import com.sam_the_dev.eventhive.domain.auth.error.TokenExpiredException
 import com.sam_the_dev.eventhive.domain.auth.error.UnauthorizedUserException
 import com.sam_the_dev.eventhive.domain.booking.error.InsufficientSeatsException
+import com.sam_the_dev.eventhive.domain.booking.error.ResourceAccessDeniedException
 import com.sam_the_dev.eventhive.domain.event.error.*
 import com.sam_the_dev.eventhive.domain.role.error.RoleNotFoundException
 import com.sam_the_dev.eventhive.domain.user.error.UserAlreadyExistsException
@@ -74,7 +75,8 @@ class GlobalExceptionHandler {
 
     // 4. Handle Forbidden Errors (403)
     @ExceptionHandler(
-        UnauthorizedEventAccessException::class
+        UnauthorizedEventAccessException::class,
+        ResourceAccessDeniedException::class
     )
     fun handleUnauthorizedAccess(
         ex: RuntimeException,

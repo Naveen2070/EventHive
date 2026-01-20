@@ -12,4 +12,7 @@ interface BookingRepository : JpaRepository<BookingEntity, Long> {
 
     // Find all bookings for a specific event (for the Organizer to see who is coming)
     fun findByEventId(eventId: Long, pageable: Pageable): Page<BookingEntity>
+
+    // Find by Booking Reference
+    fun findByBookingReference(bookingReference: String): BookingEntity?
 }
