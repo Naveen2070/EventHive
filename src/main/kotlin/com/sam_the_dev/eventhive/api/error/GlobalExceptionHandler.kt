@@ -12,6 +12,7 @@ import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.context.request.WebRequest
@@ -52,7 +53,32 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.BAD_REQUEST)
     }
 
-    // 3. Handle Authentication Errors (401)
+    // 3. Handle Validation Errors (400)
+    @ExceptionHandler(MethodArgumentNotValidException::class)
+    fun handleValidationExceptions(
+        ex: MethodArgumentNotValidException,
+        request: WebRequest
+    ): ResponseEntity<ApiErrorResponse> {
+
+        // Extract all error messages into a single list
+        val errors = ex.bindingResult
+            .allErrors
+            .joinToString(", ")
+            { error ->
+                error.defaultMessage ?: "Invalid value"
+            }
+
+        val errorResponse = ApiErrorResponse(
+            status = HttpStatus.BAD_REQUEST.value(),
+            error = "Validation Failed",
+            message = errors,
+            path = request.getDescription(false).replace("uri=", "")
+        )
+
+        return ResponseEntity(errorResponse, HttpStatus.BAD_REQUEST)
+    }
+
+    // 4. Handle Authentication Errors (401)
     @ExceptionHandler(
         InvalidCredentialsException::class,
         TokenExpiredException::class,
@@ -73,7 +99,7 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.UNAUTHORIZED)
     }
 
-    // 4. Handle Forbidden Errors (403)
+    // 5. Handle Forbidden Errors (403)
     @ExceptionHandler(
         UnauthorizedEventAccessException::class,
         ResourceAccessDeniedException::class
@@ -92,7 +118,7 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.FORBIDDEN)
     }
 
-    // 5. Handle Business Rule Conflicts (409)
+    // 6. Handle Business Rule Conflicts (409)
     @ExceptionHandler(
         EventNotPublishedException::class,
         EventAlreadyStartedException::class,
@@ -116,11 +142,11 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.CONFLICT)
     }
 
-    // 6. Handle Everything Else (500)
+    // 7. Handle Everything Else (500)
     @ExceptionHandler(Exception::class)
     fun handleGlobalException(ex: Exception, request: WebRequest): ResponseEntity<ApiErrorResponse> {
         // Log the real error internally so you can debug it later
-         logger.error("Unexpected error", ex)
+        logger.error("Unexpected error", ex)
 
         val errorResponse = ApiErrorResponse(
             status = HttpStatus.INTERNAL_SERVER_ERROR.value(),

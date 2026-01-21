@@ -2,6 +2,7 @@ package com.sam_the_dev.eventhive.api.controller
 
 import com.sam_the_dev.eventhive.api.dto.*
 import com.sam_the_dev.eventhive.domain.booking.BookingService
+import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpStatus
@@ -19,7 +20,7 @@ class BookingController(
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     fun createBooking(
-        @RequestBody request: CreateBookingRequest,
+        @Valid @RequestBody request: CreateBookingRequest,
         authentication: Authentication
     ): ResponseEntity<BookingDTO> {
         val userEmail = authentication.name
@@ -45,7 +46,7 @@ class BookingController(
     @PreAuthorize("isAuthenticated()")
     fun updateBookingStatus(
         @PathVariable id: Long,
-        @RequestBody request: UpdateBookingStatusRequest,
+        @Valid @RequestBody request: UpdateBookingStatusRequest,
         authentication: Authentication
     ): ResponseEntity<BookingDTO> {
         val isAdmin = authentication.authorities.any {
@@ -60,7 +61,7 @@ class BookingController(
     // Instead, you secure this by validating a "Signature Header" secret.
     // For now, we will mark it permitAll() in SecurityConfig or leave it open for testing.
     @PostMapping("/webhook/payment")
-    fun handlePaymentWebhook(@RequestBody payload: PaymentWebhookPayload): ResponseEntity<String> {
+    fun handlePaymentWebhook(@Valid @RequestBody payload: PaymentWebhookPayload): ResponseEntity<String> {
         bookingService.processPaymentWebhook(payload)
         return ResponseEntity.ok("payment status process successfully")
     }

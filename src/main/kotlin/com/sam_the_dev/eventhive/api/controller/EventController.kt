@@ -2,6 +2,7 @@ package com.sam_the_dev.eventhive.api.controller
 
 import com.sam_the_dev.eventhive.api.dto.*
 import com.sam_the_dev.eventhive.domain.event.EventService
+import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpStatus
@@ -19,7 +20,7 @@ class EventController(
     @PostMapping
     @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN', 'SUPER_ADMIN')")
     fun createEvent(
-        @RequestBody request: CreateEventRequest,
+        @Valid @RequestBody request: CreateEventRequest,
     ): ResponseEntity<EventDTO> {
         val response = eventService.createEvent(request)
         return ResponseEntity(response, HttpStatus.CREATED)
@@ -53,7 +54,7 @@ class EventController(
     @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN', 'SUPER_ADMIN')")
     fun updateEvent(
         @PathVariable id: Long,
-        @RequestBody request: UpdateEventRequest,
+        @Valid @RequestBody request: UpdateEventRequest,
         authentication: Authentication
     ): ResponseEntity<EventDTO> {
         val isAdmin = authentication.authorities.any {
@@ -68,7 +69,7 @@ class EventController(
     @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN', 'SUPER_ADMIN')")
     fun changeStatus(
         @PathVariable id: Long,
-        @RequestBody request: ChangeEventStatusRequest,
+        @Valid @RequestBody request: ChangeEventStatusRequest,
         authentication: Authentication
     ): ResponseEntity<EventDTO> {
         val isAdmin = authentication.authorities.any {
