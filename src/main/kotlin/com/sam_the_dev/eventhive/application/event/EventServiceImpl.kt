@@ -2,6 +2,7 @@ package com.sam_the_dev.eventhive.application.event
 
 import com.sam_the_dev.eventhive.api.dto.CreateEventRequest
 import com.sam_the_dev.eventhive.api.dto.EventDTO
+import com.sam_the_dev.eventhive.api.dto.EventSearchCriteria
 import com.sam_the_dev.eventhive.api.dto.UpdateEventRequest
 import com.sam_the_dev.eventhive.api.mapper.toDTO
 import com.sam_the_dev.eventhive.domain.event.EventService
@@ -10,6 +11,7 @@ import com.sam_the_dev.eventhive.domain.event.error.*
 import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
 import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventEntity
 import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventRepository
+import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventSpecification
 import com.sam_the_dev.eventhive.infrastructure.persistence.event.toDomain
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.toDomain
@@ -61,7 +63,8 @@ class EventServiceImpl(
     }
 
     @Transactional(readOnly = true)
-    override fun getAllEvents(pageable: Pageable): Page<EventDTO> {
+    override fun getAllEvents(pageable: Pageable, criteria: EventSearchCriteria): Page<EventDTO> {
+        EventSpecification.withCriteria(criteria)
         return eventRepository.findAll(pageable)
             .map { it.toDomain().toDTO() }
     }

@@ -10,6 +10,8 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
+import java.math.BigDecimal
+import java.time.LocalDateTime
 
 @RestController
 @RequestMapping("/api/events")
@@ -28,9 +30,25 @@ class EventController(
 
     @GetMapping
     fun getAllEvents(
-        @PageableDefault(size = 10, sort = ["startDate"]) pageable: Pageable
-    ):  ResponseEntity<PaginatedResponse<EventDTO>> {
-        val page = eventService.getAllEvents(pageable)
+        @PageableDefault(size = 10, sort = ["startDate"]) pageable: Pageable,
+        @RequestParam(required = false) title: String?,
+        @RequestParam(required = false) location: String?,
+        @RequestParam(required = false) minPrice: BigDecimal?,
+        @RequestParam(required = false) maxPrice: BigDecimal?,
+        @RequestParam(required = false) startDate: LocalDateTime?,
+        @RequestParam(required = false) endDate: LocalDateTime?,
+        @RequestParam(required = false, defaultValue = "PUBLISHED") status: String?
+    ): ResponseEntity<PaginatedResponse<EventDTO>> {
+        val criteria = EventSearchCriteria(
+            title = title,
+            location = location,
+            minPrice = minPrice,
+            maxPrice = maxPrice,
+            startDate = startDate,
+            endDate = endDate,
+            status = status
+        )
+        val page = eventService.getAllEvents(pageable, criteria)
         return ResponseEntity.ok(page.toPaginatedResponse())
     }
 
