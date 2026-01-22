@@ -10,6 +10,7 @@ import com.sam_the_dev.eventhive.domain.booking.BookingStatus
 import com.sam_the_dev.eventhive.domain.booking.error.BookingNotFoundException
 import com.sam_the_dev.eventhive.domain.booking.error.InsufficientSeatsException
 import com.sam_the_dev.eventhive.domain.booking.error.ResourceAccessDeniedException
+import com.sam_the_dev.eventhive.domain.booking.event.BookingSuccessEvent
 import com.sam_the_dev.eventhive.domain.event.EventStatus
 import com.sam_the_dev.eventhive.domain.event.error.EventAlreadyStartedException
 import com.sam_the_dev.eventhive.domain.event.error.EventNotFoundException
@@ -23,6 +24,7 @@ import com.sam_the_dev.eventhive.infrastructure.persistence.event.toDomain
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.toDomain
 import org.slf4j.LoggerFactory
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.dao.OptimisticLockingFailureException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -36,7 +38,8 @@ import java.time.LocalDateTime
 class BookingServiceImpl(
     private val bookingRepository: BookingRepository,
     private val eventRepository: EventRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val eventPublisher: ApplicationEventPublisher
 ) : BookingService {
 
     private val logger = LoggerFactory.getLogger(BookingServiceImpl::class.java)
@@ -99,12 +102,19 @@ class BookingServiceImpl(
             val savedBooking = bookingRepository.save(bookingEntity)
 
 
-            val booking = savedBooking.toDomain()
+            val booking = savedBooking.toDomain().toDTO()
+
+            eventPublisher.publishEvent(
+                BookingSuccessEvent(
+                    booking = booking,
+                    userEmail = userEmail
+                )
+            )
 
             logger.info("Booking successful: ${savedBooking.bookingReference}")
 
             // 8. Return DTO
-            return booking.toDTO()
+            return booking
         }catch (e: Exception){
             logger.error("Failed to save booking: ${e.message}")
             throw RuntimeException("Failed to save booking: ${e.message}")
