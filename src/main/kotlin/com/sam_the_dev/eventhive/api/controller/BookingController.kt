@@ -2,6 +2,13 @@ package com.sam_the_dev.eventhive.api.controller
 
 import com.sam_the_dev.eventhive.api.dto.*
 import com.sam_the_dev.eventhive.domain.booking.BookingService
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.media.Schema
+import io.swagger.v3.oas.annotations.responses.ApiResponse
+import io.swagger.v3.oas.annotations.responses.ApiResponses
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
@@ -13,56 +20,140 @@ import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/bookings")
+@Tag(
+    name = "Bookings",
+    description = "APIs for creating, viewing, and managing event bookings"
+)
 class BookingController(
     private val bookingService: BookingService
 ) {
 
+    @Operation(
+        summary = "Create a booking",
+        description = "Creates a booking for the authenticated user for a specific event."
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "201",
+                description = "Booking created successfully",
+                content = [Content(schema = Schema(implementation = BookingDTO::class))]
+            ),
+            ApiResponse(responseCode = "400", description = "Invalid booking request"),
+            ApiResponse(responseCode = "401", description = "Unauthorized"),
+            ApiResponse(responseCode = "404", description = "User or Event not found"),
+            ApiResponse(responseCode = "409", description = "Insufficient seats or event state conflict")
+        ]
+    )
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     fun createBooking(
-        @Valid @RequestBody request: CreateBookingRequest,
+        @Valid
+        @RequestBody
+        @Parameter(description = "Booking creation request", required = true)
+        request: CreateBookingRequest,
         authentication: Authentication
     ): ResponseEntity<BookingDTO> {
         val userEmail = authentication.name
-
         val response = bookingService.createBooking(request, userEmail)
-
         return ResponseEntity(response, HttpStatus.CREATED)
     }
 
+    @Operation(
+        summary = "Get my bookings",
+        description = "Returns a paginated list of bookings for the authenticated user."
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "Bookings retrieved successfully",
+                content = [Content(schema = Schema(implementation = PaginatedResponse::class))]
+            ),
+            ApiResponse(responseCode = "401", description = "Unauthorized")
+        ]
+    )
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     fun getMyBookings(
         authentication: Authentication,
-        @PageableDefault(size = 10, sort = ["createdAt"]) pageable: Pageable
+        @Parameter(description = "Pagination information")
+        @PageableDefault(size = 10, sort = ["createdAt"])
+        pageable: Pageable
     ): ResponseEntity<PaginatedResponse<BookingDTO>> {
         val userEmail = authentication.name
         val bookings = bookingService.getMyBookings(userEmail, pageable)
-
         return ResponseEntity.ok(bookings.toPaginatedResponse())
     }
 
+    @Operation(
+        summary = "Update booking status",
+        description = """
+            Updates the status of a booking.
+            - Users can only CANCEL their own bookings.
+            - Admins can update any booking status.
+        """
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "Booking status updated successfully",
+                content = [Content(schema = Schema(implementation = BookingDTO::class))]
+            ),
+            ApiResponse(responseCode = "401", description = "Unauthorized"),
+            ApiResponse(responseCode = "403", description = "Access denied"),
+            ApiResponse(responseCode = "404", description = "Booking not found"),
+            ApiResponse(responseCode = "409", description = "Seat availability conflict")
+        ]
+    )
     @PatchMapping("/status/{id}")
     @PreAuthorize("isAuthenticated()")
     fun updateBookingStatus(
+        @Parameter(description = "Booking ID", required = true)
         @PathVariable id: Long,
-        @Valid @RequestBody request: UpdateBookingStatusRequest,
+        @Valid
+        @RequestBody
+        @Parameter(description = "Booking status update request", required = true)
+        request: UpdateBookingStatusRequest,
         authentication: Authentication
     ): ResponseEntity<BookingDTO> {
         val isAdmin = authentication.authorities.any {
             it.authority == "ROLE_ADMIN" || it.authority == "ROLE_SUPER_ADMIN"
         }
-        val response = bookingService.updateBookingStatus(id, request.status, authentication.name, isAdmin)
+
+        val response = bookingService.updateBookingStatus(
+            id,
+            request.status,
+            authentication.name,
+            isAdmin
+        )
+
         return ResponseEntity.ok(response)
     }
 
-    // ⚡ Webhook Endpoint
-    // In a real scenario, this shouldn't use "PreAuthorize" because Stripe/PayPal calls it, not a logged-in user.
-    // Instead, you secure this by validating a "Signature Header" secret.
-    // For now, we will mark it permitAll() in SecurityConfig or leave it open for testing.
+    @Operation(
+        summary = "Payment webhook",
+        description = """
+            Handles payment provider webhooks (Stripe/PayPal).
+            This endpoint is NOT authenticated and should be secured via signature verification.
+        """
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Webhook processed successfully"),
+            ApiResponse(responseCode = "400", description = "Invalid webhook payload"),
+            ApiResponse(responseCode = "500", description = "Internal server error")
+        ]
+    )
     @PostMapping("/webhook/payment")
-    fun handlePaymentWebhook(@Valid @RequestBody payload: PaymentWebhookPayload): ResponseEntity<String> {
+    fun handlePaymentWebhook(
+        @Valid
+        @RequestBody
+        @Parameter(description = "Payment webhook payload", required = true)
+        payload: PaymentWebhookPayload
+    ): ResponseEntity<String> {
         bookingService.processPaymentWebhook(payload)
-        return ResponseEntity.ok("payment status process successfully")
+        return ResponseEntity.ok("payment status processed successfully")
     }
 }

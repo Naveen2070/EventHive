@@ -86,31 +86,56 @@ docker run --name eventhive-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=po
 
 ## 🔌 API Endpoints
 
-### Authentication
+---
 
-| Method | Endpoint | Description | Access |
-| --- | --- | --- | --- |
-| `POST` | `/api/auth/register` | Register a new user | Public |
-| `POST` | `/api/auth/login` | Login and receive JWT | Public |
+## 🔐 Authentication
 
-### Events
+| Method | Endpoint             | Description           | Access |
+| ------ | -------------------- | --------------------- | ------ |
+| `POST` | `/api/auth/register` | Register a new user   | Public |
+| `POST` | `/api/auth/login`    | Login and receive JWT | Public |
 
-| Method | Endpoint | Description | Access |
-| --- | --- | --- | --- |
-| `GET` | `/api/events` | Browse all events (Paginated) | Public |
-| `POST` | `/api/events` | Create a new event | `ORGANIZER`, `ADMIN` |
+---
 
-### Bookings (Concurrency Safe)
+## 👤 Users
 
-| Method | Endpoint | Description | Access |
-| --- | --- | --- | --- |
-| `POST` | `/api/bookings` | Book tickets | Authenticated User |
+| Method | Endpoint               | Description            | Access        |
+| ------ | ---------------------- | ---------------------- | ------------- |
+| `GET`  | `/api/user/users/{id}` | Get user details by ID | Authenticated |
 
-### Admin
+---
 
-| Method | Endpoint | Description | Access |
-| --- | --- | --- | --- |
-| `PUT` | `/api/admin/users/{id}/roles` | Promote user roles | `ADMIN` |
+## 🎫 Events
+
+| Method   | Endpoint                  | Description                               | Access                              |
+| -------- | ------------------------- | ----------------------------------------- | ----------------------------------- |
+| `GET`    | `/api/events`             | Browse all events (paginated + filters)   | Public                              |
+| `GET`    | `/api/events/{id}`        | Get event by ID                           | Public                              |
+| `GET`    | `/api/events/organizer`   | Get events created by logged-in organizer | `ORGANIZER`                         |
+| `POST`   | `/api/events`             | Create a new event                        | `ORGANIZER`, `ADMIN`, `SUPER_ADMIN` |
+| `PUT`    | `/api/events/{id}`        | Update an event                           | `ORGANIZER`, `ADMIN`, `SUPER_ADMIN` |
+| `PATCH`  | `/api/events/status/{id}` | Change event status                       | `ORGANIZER`, `ADMIN`, `SUPER_ADMIN` |
+| `DELETE` | `/api/events/{id}`        | Soft delete an event                      | `ORGANIZER`, `ADMIN`, `SUPER_ADMIN` |
+
+---
+
+## 🎟️ Bookings (Concurrency Safe)
+
+| Method  | Endpoint                        | Description                                   | Access                         |
+| ------- | ------------------------------- | --------------------------------------------- | ------------------------------ |
+| `POST`  | `/api/bookings`                 | Create a booking                              | Authenticated                  |
+| `GET`   | `/api/bookings`                 | Get my bookings (paginated)                   | Authenticated                  |
+| `PATCH` | `/api/bookings/status/{id}`     | Update booking status (cancel / admin update) | Authenticated                  |
+| `POST`  | `/api/bookings/webhook/payment` | Payment provider webhook                      | Public (secured via signature) |
+
+---
+
+## 🛡️ Admin – Role Management
+
+| Method   | Endpoint                           | Description           | Access                 |
+| -------- | ---------------------------------- | --------------------- | ---------------------- |
+| `PUT`    | `/api/admin/roles/assign/{userId}` | Assign role to user   | `ADMIN`, `SUPER_ADMIN` |
+| `DELETE` | `/api/admin/roles/remove/{userId}` | Remove role from user | `ADMIN`, `SUPER_ADMIN` |
 
 ---
 

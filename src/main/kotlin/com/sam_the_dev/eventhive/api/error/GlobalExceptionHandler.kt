@@ -39,21 +39,7 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.NOT_FOUND)
     }
 
-    // 2. Handle "Bad Request" (400)
-    @ExceptionHandler(
-        UserAlreadyExistsException::class
-    )
-    fun handleBadRequest(ex: RuntimeException, request: WebRequest): ResponseEntity<ApiErrorResponse> {
-        val errorResponse = ApiErrorResponse(
-            status = HttpStatus.BAD_REQUEST.value(),
-            error = HttpStatus.BAD_REQUEST.reasonPhrase,
-            message = ex.message ?: "Invalid request",
-            path = request.getDescription(false).replace("uri=", "")
-        )
-        return ResponseEntity(errorResponse, HttpStatus.BAD_REQUEST)
-    }
-
-    // 3. Handle Validation Errors (400)
+    // 3. Handle Validation Errors or Bad Request (400)
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidationExceptions(
         ex: MethodArgumentNotValidException,
@@ -120,6 +106,7 @@ class GlobalExceptionHandler {
 
     // 6. Handle Business Rule Conflicts (409)
     @ExceptionHandler(
+        UserAlreadyExistsException::class,
         EventNotPublishedException::class,
         EventAlreadyStartedException::class,
         InsufficientSeatsException::class,
