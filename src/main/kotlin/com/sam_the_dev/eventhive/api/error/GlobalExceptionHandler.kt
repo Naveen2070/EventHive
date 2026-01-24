@@ -39,7 +39,7 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.NOT_FOUND)
     }
 
-    // 3. Handle Validation Errors or Bad Request (400)
+    // 2. Handle Validation Errors or Bad Request (400)
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidationExceptions(
         ex: MethodArgumentNotValidException,
@@ -64,7 +64,7 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.BAD_REQUEST)
     }
 
-    // 4. Handle Authentication Errors (401)
+    // 3. Handle Authentication Errors (401)
     @ExceptionHandler(
         InvalidCredentialsException::class,
         TokenExpiredException::class,
@@ -85,7 +85,7 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.UNAUTHORIZED)
     }
 
-    // 5. Handle Forbidden Errors (403)
+    // 4. Handle Forbidden Errors (403)
     @ExceptionHandler(
         UnauthorizedEventAccessException::class,
         ResourceAccessDeniedException::class
@@ -104,7 +104,7 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.FORBIDDEN)
     }
 
-    // 6. Handle Business Rule Conflicts (409)
+    // 5. Handle Business Rule Conflicts (409)
     @ExceptionHandler(
         UserAlreadyExistsException::class,
         EventNotPublishedException::class,
@@ -127,6 +127,18 @@ class GlobalExceptionHandler {
         )
 
         return ResponseEntity(errorResponse, HttpStatus.CONFLICT)
+    }
+
+    // 6. Handle Rate Limit (429)
+    @ExceptionHandler(RateLimitExceededException::class)
+    fun handleRateLimit(ex: RateLimitExceededException, request: WebRequest): ResponseEntity<ApiErrorResponse> {
+        val errorResponse = ApiErrorResponse(
+            status = HttpStatus.TOO_MANY_REQUESTS.value(),
+            error = "Too Many Requests",
+            message = ex.message ?: "Rate limit exceeded",
+            path = request.getDescription(false).replace("uri=", "")
+        )
+        return ResponseEntity(errorResponse, HttpStatus.TOO_MANY_REQUESTS)
     }
 
     // 7. Handle Everything Else (500)
