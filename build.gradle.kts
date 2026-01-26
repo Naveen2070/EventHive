@@ -23,6 +23,12 @@ configurations {
 	}
 }
 
+val mockitoAgent by configurations.creating {
+	isCanBeResolved = true
+	isCanBeConsumed = false
+	isTransitive = false
+}
+
 repositories {
 	mavenCentral()
 }
@@ -55,6 +61,7 @@ dependencies {
 	testImplementation("org.springframework.security:spring-security-test")
 	testImplementation("org.testcontainers:junit-jupiter")
 	testImplementation("org.testcontainers:postgresql")
+	mockitoAgent("org.mockito:mockito-core")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -72,4 +79,10 @@ allOpen {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+	systemProperty("user.timezone", "UTC")
+	jvmArgs("-javaagent:${mockitoAgent.singleFile}")
+	reports {
+		html.required.set(true)
+		junitXml.required.set(true)
+	}
 }
