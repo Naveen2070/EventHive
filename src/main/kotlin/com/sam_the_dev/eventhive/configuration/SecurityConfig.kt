@@ -2,6 +2,7 @@ package com.sam_the_dev.eventhive.configuration
 
 import com.sam_the_dev.eventhive.infrastructure.security.CustomUserDetailsService
 import com.sam_the_dev.eventhive.infrastructure.security.JwtAuthenticationFilter
+import jakarta.servlet.http.HttpServletResponse
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpMethod
@@ -65,7 +66,13 @@ class SecurityConfig(
             .authenticationProvider(authenticationProvider())
             // Add JWT filter before UsernamePasswordAuthenticationFilter
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
-
+            .exceptionHandling { exceptions ->
+                exceptions.authenticationEntryPoint { _, response, authException ->
+                    response.status = HttpServletResponse.SC_UNAUTHORIZED
+                    response.contentType = "application/json"
+                    response.writer.write("""{"error":"Unauthorized","message":"${authException.message}"}""")
+                }
+            }
         return http.build()
     }
 

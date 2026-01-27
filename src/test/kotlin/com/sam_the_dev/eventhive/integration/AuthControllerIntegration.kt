@@ -20,7 +20,7 @@ import org.springframework.test.web.servlet.post
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration::class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class AuthIntegrationTest {
+class AuthControllerIntegrationTest {
 
     @Autowired lateinit var mockMvc: MockMvc
     @Autowired lateinit var objectMapper: ObjectMapper
