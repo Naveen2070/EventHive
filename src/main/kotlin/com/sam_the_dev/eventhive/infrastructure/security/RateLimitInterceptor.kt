@@ -3,9 +3,11 @@ package com.sam_the_dev.eventhive.infrastructure.security
 import com.sam_the_dev.eventhive.api.error.RateLimitExceededException
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
 import org.springframework.web.servlet.HandlerInterceptor
 
+@Profile("!test")
 @Component
 class RateLimitInterceptor(
     private val rateLimitingService: RateLimitingService

@@ -12,6 +12,7 @@ import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -88,7 +89,8 @@ class GlobalExceptionHandler {
     // 4. Handle Forbidden Errors (403)
     @ExceptionHandler(
         UnauthorizedEventAccessException::class,
-        ResourceAccessDeniedException::class
+        ResourceAccessDeniedException::class,
+        AccessDeniedException::class
     )
     fun handleUnauthorizedAccess(
         ex: RuntimeException,

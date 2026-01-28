@@ -21,14 +21,18 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.security.crypto.password.PasswordEncoder
+import org.springframework.test.annotation.DirtiesContext
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import kotlin.test.assertTrue
 
+@ActiveProfiles("test")
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration::class)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class EventControllerIntegrationTest {
 
     @Autowired lateinit var mockMvc: MockMvc
@@ -45,6 +49,7 @@ class EventControllerIntegrationTest {
 
     // Test Data
     private var organizerId: Long = 0
+    private var userId: Long = 0
 
     @BeforeEach
     fun setup() {
@@ -61,8 +66,9 @@ class EventControllerIntegrationTest {
         organizerToken = registerAndLogin("org", "org@test.com", "pass@123", roleOrg)
         organizerId = userRepository.findByUsernameOrEmail("org@test.com", "org@test.com")!!.id!!
 
-        adminToken = registerAndLogin("admin", "admin@test.com", "pass@123", roleAdmin)
-        userToken = registerAndLogin("user", "user@test.com", "pass@123", roleUser)
+        adminToken = registerAndLogin("admin", "admin@test.com", "pass@1234", roleAdmin)
+        userToken = registerAndLogin("user", "user@test.com", "pass@12345", roleUser)
+        userId = userRepository.findByUsernameOrEmail("user@test.com","user@test.com")!!.id!!
     }
 
     // Helper to register, login, and return JWT
@@ -129,7 +135,7 @@ class EventControllerIntegrationTest {
             price = BigDecimal("10.00"),
             totalSeats = 10,
             organizerEmail = "user@test.com",
-            createdBy = 0
+            createdBy = userId
         )
 
         mockMvc.post("/api/events") {
@@ -137,7 +143,7 @@ class EventControllerIntegrationTest {
             contentType = MediaType.APPLICATION_JSON
             content = objectMapper.writeValueAsString(request)
         }.andExpect {
-            status { isForbidden() } // 403
+            status { isForbidden() }
         }
     }
 

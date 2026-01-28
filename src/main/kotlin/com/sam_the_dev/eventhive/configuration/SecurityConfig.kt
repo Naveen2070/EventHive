@@ -43,6 +43,8 @@ class SecurityConfig(
                     ).permitAll()
                     // auth endpoint
                     .requestMatchers("/api/auth/**").permitAll()
+                    // payment webHook
+                    .requestMatchers("/api/bookings/webhook/payment").permitAll()
                     // events public endpoints
                     .requestMatchers(HttpMethod.GET, "/api/events/**").permitAll()
 

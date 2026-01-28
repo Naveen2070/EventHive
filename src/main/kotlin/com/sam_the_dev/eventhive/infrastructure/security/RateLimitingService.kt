@@ -2,10 +2,12 @@ package com.sam_the_dev.eventhive.infrastructure.security
 
 import io.github.bucket4j.Bandwidth
 import io.github.bucket4j.Bucket
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Service
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
+@Profile("!test")
 @Service
 class RateLimitingService {
     // Store buckets in memory: Map<IP_Address, Bucket>

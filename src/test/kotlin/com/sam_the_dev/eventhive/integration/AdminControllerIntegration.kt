@@ -18,12 +18,14 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.test.annotation.DirtiesContext
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
 import kotlin.test.assertTrue
 
+@ActiveProfiles("test")
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration::class)
@@ -38,7 +40,7 @@ class AdminControllerIntegrationTest {
 
     private lateinit var adminToken: String
     private var targetUserId: Long = 0
-    private var AdminUserId: Long = 0
+    private var adminUserId: Long = 0
 
     @BeforeEach
     fun setup() {
@@ -61,7 +63,7 @@ class AdminControllerIntegrationTest {
         val adminRole = UserRoleEntity(role = roleAdmin, user = savedAdmin, createdBy = 0L, updatedBy = 0L)
         savedAdmin.userRoles.add(adminRole)
         userRepository.save(savedAdmin)
-        AdminUserId = savedAdmin.id!!
+        adminUserId = savedAdmin.id!!
 
         // 3. Create a Target User (To receive the roles)
         val targetUser = UserEntity(
@@ -89,7 +91,7 @@ class AdminControllerIntegrationTest {
     fun `should assign ORGANIZER to a user successfully`() {
         val request = RoleAssignmentRequest(
                 roleName = "ORGANIZER",
-                updateBy = AdminUserId
+                updateBy = adminUserId
         )
 
         mockMvc.put("/api/admin/roles/assign/$targetUserId") {
@@ -122,7 +124,7 @@ class AdminControllerIntegrationTest {
         // 2. Request to remove ORGANIZER (Logic depends on your service: usually resets to USER or null)
         val request = RoleAssignmentRequest(
                 roleName = "ORGANIZER",
-                updateBy = AdminUserId
+                updateBy = adminUserId
         )
 
         mockMvc.delete("/api/admin/roles/remove/$targetUserId") {
@@ -169,7 +171,7 @@ class AdminControllerIntegrationTest {
 
     @Test
     fun `should return 404 if user not found`() {
-        val request = RoleAssignmentRequest(roleName = "ORGANIZER", updateBy = AdminUserId)
+        val request = RoleAssignmentRequest(roleName = "ORGANIZER", updateBy = adminUserId)
 
         mockMvc.put("/api/admin/roles/assign/999999") {
             header("Authorization", "Bearer $adminToken")

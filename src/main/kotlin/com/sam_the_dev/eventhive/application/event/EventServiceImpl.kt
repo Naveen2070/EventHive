@@ -64,8 +64,8 @@ class EventServiceImpl(
 
     @Transactional(readOnly = true)
     override fun getAllEvents(pageable: Pageable, criteria: EventSearchCriteria): Page<EventDTO> {
-        EventSpecification.withCriteria(criteria)
-        return eventRepository.findAll(pageable)
+        val specification = EventSpecification.withCriteria(criteria)
+        return eventRepository.findAll(specification,pageable)
             .map { it.toDomain().toDTO() }
     }
 
