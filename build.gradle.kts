@@ -1,10 +1,10 @@
 plugins {
-	kotlin("jvm") version "1.9.25"
-	kotlin("plugin.spring") version "1.9.25"
+	kotlin("jvm") version "2.3.0"
+	kotlin("plugin.spring") version "2.3.0"
 	war
 	id("org.springframework.boot") version "3.5.9"
 	id("io.spring.dependency-management") version "1.1.7"
-	kotlin("plugin.jpa") version "1.9.25"
+	kotlin("plugin.jpa") version "2.3.0"
 }
 
 group = "com.sam_the_dev"
@@ -58,6 +58,7 @@ dependencies {
 	testImplementation("org.testcontainers:junit-jupiter")
 	testImplementation("org.testcontainers:postgresql")
 	testImplementation("org.mockito:mockito-core")
+	testImplementation("org.mockito.kotlin:mockito-kotlin:6.2.3")
     mockitoAgent?.invoke("org.mockito:mockito-core"){
 		isTransitive = false
 	}

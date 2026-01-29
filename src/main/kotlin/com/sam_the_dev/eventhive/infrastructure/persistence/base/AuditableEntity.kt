@@ -7,11 +7,11 @@ import java.time.Instant
 abstract class AuditableEntity {
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    lateinit var createdAt: Instant
+     var createdAt: Instant = Instant.now()
         protected set
 
     @Column(name = "updated_at", nullable = false)
-    lateinit var updatedAt: Instant
+     var updatedAt: Instant = Instant.now()
         protected set
 
     @Column(name = "deleted_by")
