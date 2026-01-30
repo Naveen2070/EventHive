@@ -27,13 +27,13 @@ services:
       db:
         condition: service_healthy
     environment:
-      # Database
+      SPRING_PROFILES_ACTIVE: prod
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/eventhive
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
 
-      # JWT
       JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION}
 
       # Mail
       MAIL_HOST: ${MAIL_HOST}
