@@ -1,0 +1,44 @@
+name: EventHive CI (Kotlin)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out your code
+      - uses: actions/checkout@v4
+
+      # 2. Set up JDK 21 (Required for Kotlin to run)
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      # 3. Grant execute permission for gradlew (CRITICAL for Linux CI)
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # 4. Run Tests (Unit + Integration)
+      # This automatically compiles your Kotlin code first
+      - name: Test with Gradle
+        run: ./gradlew test
+
+#      # 5. Build the WAR file (Skipping tests since we just ran them)
+#      - name: Build WAR with Gradle
+#        run: ./gradlew bootWar -x test
+#
+#      # 6. Upload the WAR file (Optional: Lets you download the built app from GitHub)
+#      - name: Upload WAR artifact
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: eventhive-app
+#          path: build/libs/*.war
+#          retention-days: 1
