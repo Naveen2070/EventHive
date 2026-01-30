@@ -1,0 +1,45 @@
+services:
+  # 1. The Database
+  db:
+    image: postgres:17.7-alpine
+    container_name: eventhive-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: eventhive
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d eventhive"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Your Application
+  app:
+    build: .
+    container_name: eventhive-api
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/eventhive
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+
+      # JWT
+      JWT_SECRET: ${JWT_SECRET}
+
+      # Mail
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+
+volumes:
+  postgres_data:

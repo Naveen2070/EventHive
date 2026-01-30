@@ -1,23 +1,23 @@
 package com.sam_the_dev.eventhive.infrastructure.security
 
+import com.sam_the_dev.eventhive.configuration.JwtProperties
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.io.Decoders
 import io.jsonwebtoken.security.Keys
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.stereotype.Service
-import java.util.Date
+import java.util.*
 import javax.crypto.SecretKey
 
 @Service
-class JwtService {
+class JwtService (
+    private val jwtProperties: JwtProperties
+){
 
-    @Value("\${jwt.secret}")
-    private lateinit var secretKey: String
+    private var secretKey: String = jwtProperties.secret
 
-    @Value("\${jwt.expiration-ms}")
-    private var expirationMs: Long = 0
+    private var expirationMs: Long = jwtProperties.expirationMs
 
     // 1. Generate Token
     fun generateToken(userDetails: UserDetails): String {
