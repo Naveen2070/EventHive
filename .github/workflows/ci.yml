@@ -31,7 +31,7 @@ jobs:
       - name: Test with Gradle
         run: ./gradlew test
 
-#      # 5. Build the WAR file (Skipping tests since we just ran them)
+#      # 5. Build the WAR file
 #      - name: Build WAR with Gradle
 #        run: ./gradlew bootWar -x test
 #
