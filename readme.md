@@ -41,7 +41,6 @@ src/main/kotlin/com/sam_the_dev/eventhive
 ├── domain              # Domain Layer (Business Logic, Interfaces, Models)
 ├── infrastructure      # Infrastructure Layer (Persistence, Security, Config)
 └── configuration       # Spring Configuration (Beans, Security Config)
-
 ```
 
 ---
@@ -59,39 +58,48 @@ src/main/kotlin/com/sam_the_dev/eventhive
 ```bash
 git clone https://github.com/Naveen2070/EventHive.git
 cd EventHive
-
 ```
 
-### 2. Configure Database
-
-You can spin up a PostgreSQL instance quickly using Docker:
+### 2. Run with Docker (Recommended)
+The easiest way to run the application (App + Database) is using Docker Compose:
 
 ```bash
-docker run --name eventhive-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=event_hive_db -p 5432:5432 -d postgres
-
+docker-compose up --build
 ```
+The API will be available at `http://localhost:8080`.
 
-*Or update `src/main/resources/application.properties` with your local credentials.*
+### 3. Manual Setup (Dev Mode)
 
-### 3. Run the Application
+If you want to run it locally for development:
 
+##### 1. Spin up the database:
+```bash
+docker run --name eventhive-db -e POSTGRES_USER=admin -e POSTGRES_PASSWORD=password -e POSTGRES_DB=eventhive -p 5432:5432 -d postgres:15-alpine
+```
+##### 2. Run the app:
 ```bash
 ./gradlew bootRun
-
 ```
+
 
 *Liquibase will automatically create the tables (`app_users`, `roles`, `events`, `bookings`) on startup.*
 
 ---
 
 ## 🔌 API Endpoints
+> 📘 **Interactive API Documentation**
+> 
+>  Once the application is running, you can explore and test the API using the available documentation UIs:
+> - 👉 **Swagger UI**: [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
+> - 👉 **ReDoc**: [http://localhost:8080/redoc.html](http://localhost:8080/redoc.html)
+> - 👉 **Scalar**: [http://localhost:8080/scalar.html](http://localhost:8080/scalar.html)
 
 ---
 
 ## 🔐 Authentication
 
 | Method | Endpoint             | Description           | Access |
-| ------ | -------------------- | --------------------- | ------ |
+|--------|----------------------|-----------------------|--------|
 | `POST` | `/api/auth/register` | Register a new user   | Public |
 | `POST` | `/api/auth/login`    | Login and receive JWT | Public |
 
@@ -100,7 +108,7 @@ docker run --name eventhive-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=po
 ## 👤 Users
 
 | Method | Endpoint               | Description            | Access        |
-| ------ | ---------------------- | ---------------------- | ------------- |
+|--------|------------------------|------------------------|---------------|
 | `GET`  | `/api/user/users/{id}` | Get user details by ID | Authenticated |
 
 ---
@@ -108,7 +116,7 @@ docker run --name eventhive-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=po
 ## 🎫 Events
 
 | Method   | Endpoint                  | Description                               | Access                              |
-| -------- | ------------------------- | ----------------------------------------- | ----------------------------------- |
+|----------|---------------------------|-------------------------------------------|-------------------------------------|
 | `GET`    | `/api/events`             | Browse all events (paginated + filters)   | Public                              |
 | `GET`    | `/api/events/{id}`        | Get event by ID                           | Public                              |
 | `GET`    | `/api/events/organizer`   | Get events created by logged-in organizer | `ORGANIZER`                         |
@@ -122,7 +130,7 @@ docker run --name eventhive-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=po
 ## 🎟️ Bookings (Concurrency Safe)
 
 | Method  | Endpoint                        | Description                                   | Access                         |
-| ------- | ------------------------------- | --------------------------------------------- | ------------------------------ |
+|---------|---------------------------------|-----------------------------------------------|--------------------------------|
 | `POST`  | `/api/bookings`                 | Create a booking                              | Authenticated                  |
 | `GET`   | `/api/bookings`                 | Get my bookings (paginated)                   | Authenticated                  |
 | `PATCH` | `/api/bookings/status/{id}`     | Update booking status (cancel / admin update) | Authenticated                  |
@@ -133,7 +141,7 @@ docker run --name eventhive-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=po
 ## 🛡️ Admin – Role Management
 
 | Method   | Endpoint                           | Description           | Access                 |
-| -------- | ---------------------------------- | --------------------- | ---------------------- |
+|----------|------------------------------------|-----------------------|------------------------|
 | `PUT`    | `/api/admin/roles/assign/{userId}` | Assign role to user   | `ADMIN`, `SUPER_ADMIN` |
 | `DELETE` | `/api/admin/roles/remove/{userId}` | Remove role from user | `ADMIN`, `SUPER_ADMIN` |
 
