@@ -16,4 +16,6 @@ data class RegisterUserDTO(
     @field:NotBlank(message = "Password is required")
     @field:Size(min = 6, max = 100, message = "Password must be at least 6 characters")
     val password: String,
+
+    val role: String = "USER",
 )

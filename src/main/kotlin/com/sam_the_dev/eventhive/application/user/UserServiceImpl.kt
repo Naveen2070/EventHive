@@ -3,10 +3,10 @@ package com.sam_the_dev.eventhive.application.user
 import com.sam_the_dev.eventhive.api.dto.RegisterUserDTO
 import com.sam_the_dev.eventhive.api.dto.UserDTO
 import com.sam_the_dev.eventhive.api.mapper.toDTO
-import com.sam_the_dev.eventhive.domain.user.error.UserAlreadyExistsException
-import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
 import com.sam_the_dev.eventhive.domain.user.User
 import com.sam_the_dev.eventhive.domain.user.UserService
+import com.sam_the_dev.eventhive.domain.user.error.UserAlreadyExistsException
+import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
 import com.sam_the_dev.eventhive.infrastructure.persistence.role.RoleRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.role.UserRoleEntity
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserRepository
@@ -33,11 +33,11 @@ class UserServiceImpl(
             throw UserAlreadyExistsException("User with username or email already exists")
         }
 
-        val userRole = roleRepository.findByName("USER")
+        val userRole = roleRepository.findByName(user.role)
 
         if (userRole == null) {
-            logger.error("Default Role 'USER' not found in database")
-            throw RuntimeException("Default Role 'USER' not found in database")
+            logger.error("Role ${user.role} not found in database")
+            throw RuntimeException("Role ${user.role} not found in database")
         }
 
         // Hash the password
