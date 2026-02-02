@@ -125,7 +125,7 @@ class UserServiceUnitTest {
         val ex = assertThrows(RuntimeException::class.java) {
             userService.registerUser(registerDTO)
         }
-        assertEquals("Default Role 'USER' not found in database", ex.message)
+        assertEquals("Role USER not found in database", ex.message)
     }
 
     @Test
