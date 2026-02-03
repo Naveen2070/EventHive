@@ -11,7 +11,6 @@ import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserRepository
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 
@@ -42,10 +41,11 @@ class DashboardServiceImpl(
         val revenueTrend = bookingRepository.getRevenueTrend(organizerId)
             .map { row ->
                 RevenueTrendItem(
-                    date = row[0] as LocalDate,
-                    revenue = row[1] as Double
+                    date = (row[0] as java.sql.Date).toLocalDate(),
+                    revenue = (row[1] as Number).toDouble()
                 )
             }
+
 
         val recentSales = bookingRepository
             .findRecentBookings(
