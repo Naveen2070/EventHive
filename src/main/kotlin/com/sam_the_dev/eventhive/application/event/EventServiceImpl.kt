@@ -49,8 +49,8 @@ class EventServiceImpl(
             availableSeats = request.totalSeats,
             status = EventStatus.DRAFT,
             organizer = organizer,
-            createdBy = request.createdBy,
-            updatedBy = request.createdBy,
+            createdBy = organizer.id ?: request.createdBy,
+            updatedBy = organizer.id ?: request.createdBy,
         )
 
         try {

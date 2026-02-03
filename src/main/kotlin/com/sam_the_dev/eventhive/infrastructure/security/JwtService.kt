@@ -26,7 +26,7 @@ class JwtService (
 
     fun generateToken(
         extraClaims: Map<String, Any>,
-        userDetails: UserDetails
+        userDetails: UserDetails,
     ): String {
         val roles = userDetails.authorities.map { it.authority }
 

@@ -49,12 +49,8 @@ data class CreateEventRequest(
     @field:Min(value = 1, message = "Total seats must be at least 1")
     val totalSeats: Int,
 
-    @field:NotBlank(message = "Organizer email is required")
-    @field:Email(message = "Invalid email format")
     val organizerEmail: String,
 
-    @field:NotNull(message = "Created by user ID is required")
-    @field:Positive(message = "Created by user ID must be positive")
     var createdBy: Long
 )
 
