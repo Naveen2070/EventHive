@@ -135,6 +135,7 @@ class EventServiceImpl(
         }
     }
 
+    @Transactional
     override fun changeEventStatus(
         eventId: Long,
         status: EventStatus,
@@ -170,6 +171,7 @@ class EventServiceImpl(
         }
     }
 
+    @Transactional
     override fun deleteEvent(eventId: Long, userEmail: String, isAdmin: Boolean) {
         val user = userRepository.findByUsernameOrEmail(userEmail, userEmail)
             ?: throw UserNotFoundException(userEmail, "User not found")

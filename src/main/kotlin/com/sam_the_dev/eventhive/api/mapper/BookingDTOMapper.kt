@@ -11,5 +11,8 @@ fun Booking.toDTO(): BookingDTO =
         ticketsCount = ticketsCount,
         totalPrice = totalPrice,
         status = status,
-        bookedAt = createdAt
+        bookedAt = createdAt,
+        eventDescription = eventDescription,
+        eventDate = eventDate,
+        eventLocation = eventLocation
     )

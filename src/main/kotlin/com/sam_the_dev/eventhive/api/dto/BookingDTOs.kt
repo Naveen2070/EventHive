@@ -9,11 +9,15 @@ data class BookingDTO(
     val bookingId: Long,
     val bookingReference: String,
     val eventTitle: String,
+    val eventDescription: String,
+    val eventDate: Instant,
+    val eventLocation: String,
     val ticketsCount: Int,
     val totalPrice: BigDecimal,
     val status: BookingStatus,
     val bookedAt: Instant
 )
+
 data class CreateBookingRequest(
     @field:NotNull(message = "Event ID is required")
     @field:Positive(message = "Event ID must be positive")

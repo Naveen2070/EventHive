@@ -4,6 +4,7 @@ import com.sam_the_dev.eventhive.domain.event.Event
 import com.sam_the_dev.eventhive.domain.user.User
 import java.math.BigDecimal
 import java.time.Instant
+import java.time.ZoneId
 import java.util.*
 
 class Booking(
@@ -12,6 +13,9 @@ class Booking(
     val userId: Long,
     val eventId: Long,
     val eventTitle: String,
+    val eventDescription: String,
+    val eventDate: Instant,
+    val eventLocation: String,
     val ticketsCount: Int,
     val totalPrice: BigDecimal,
     val status: BookingStatus,
@@ -41,7 +45,10 @@ class Booking(
                 createdAt = Instant.now(),
                 updatedAt = Instant.now(),
                 isActive = true,
-                isDeleted = false
+                isDeleted = false,
+                eventDescription = event.description,
+                eventDate = event.startDate.atZone(ZoneId.systemDefault()).toInstant(),
+                eventLocation = event.location
             )
         }
     }
