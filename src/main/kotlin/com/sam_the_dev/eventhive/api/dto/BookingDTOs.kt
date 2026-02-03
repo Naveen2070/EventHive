@@ -8,6 +8,7 @@ import java.time.Instant
 data class BookingDTO(
     val bookingId: Long,
     val bookingReference: String,
+    val eventId: Long,
     val eventTitle: String,
     val eventDescription: String,
     val eventDate: Instant,

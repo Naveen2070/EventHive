@@ -7,6 +7,7 @@ fun Booking.toDTO(): BookingDTO =
     BookingDTO(
         bookingId = requireNotNull(id) { "Booking ID cannot be null when converting to DTO" },
         bookingReference = bookingReference,
+        eventId = eventId,
         eventTitle = eventTitle,
         ticketsCount = ticketsCount,
         totalPrice = totalPrice,
