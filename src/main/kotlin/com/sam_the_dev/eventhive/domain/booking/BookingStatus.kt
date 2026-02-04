@@ -6,5 +6,5 @@ enum class BookingStatus {
     CANCELLED,
     REFUNDED,
     EXPIRED,
-    USED,
+    CHECKED_IN,
 }

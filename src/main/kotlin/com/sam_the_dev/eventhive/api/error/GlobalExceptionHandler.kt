@@ -5,6 +5,8 @@ import com.sam_the_dev.eventhive.domain.auth.error.TokenExpiredException
 import com.sam_the_dev.eventhive.domain.auth.error.UnauthorizedUserException
 import com.sam_the_dev.eventhive.domain.booking.error.InsufficientSeatsException
 import com.sam_the_dev.eventhive.domain.booking.error.ResourceAccessDeniedException
+import com.sam_the_dev.eventhive.domain.booking.error.TicketAlreadyUsedException
+import com.sam_the_dev.eventhive.domain.booking.error.TicketInValidException
 import com.sam_the_dev.eventhive.domain.event.error.*
 import com.sam_the_dev.eventhive.domain.role.error.RoleNotFoundException
 import com.sam_the_dev.eventhive.domain.user.error.UserAlreadyExistsException
@@ -41,7 +43,9 @@ class GlobalExceptionHandler {
     }
 
     // 2. Handle Validation Errors or Bad Request (400)
-    @ExceptionHandler(MethodArgumentNotValidException::class)
+    @ExceptionHandler(
+        MethodArgumentNotValidException::class
+    )
     fun handleValidationExceptions(
         ex: MethodArgumentNotValidException,
         request: WebRequest
@@ -65,7 +69,27 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.BAD_REQUEST)
     }
 
-    // 3. Handle Authentication Errors (401)
+    // 3. Handle ticket validation (400)
+    @ExceptionHandler(
+        TicketAlreadyUsedException::class,
+        TicketInValidException::class
+    )
+    fun handleInValidTicket(
+        ex: RuntimeException,
+        request: WebRequest
+    ): ResponseEntity<ApiErrorResponse> {
+
+        val errorResponse = ApiErrorResponse(
+            status = HttpStatus.BAD_REQUEST.value(),
+            error = HttpStatus.BAD_REQUEST.reasonPhrase,
+            message = ex.message ?: "Ticket Invalid",
+            path = request.getDescription(false).replace("uri=", "")
+        )
+
+        return ResponseEntity(errorResponse, HttpStatus.BAD_REQUEST)
+    }
+
+    // 4. Handle Authentication Errors (401)
     @ExceptionHandler(
         InvalidCredentialsException::class,
         TokenExpiredException::class,
@@ -86,7 +110,7 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.UNAUTHORIZED)
     }
 
-    // 4. Handle Forbidden Errors (403)
+    // 5. Handle Forbidden Errors (403)
     @ExceptionHandler(
         UnauthorizedEventAccessException::class,
         ResourceAccessDeniedException::class,
@@ -106,7 +130,7 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.FORBIDDEN)
     }
 
-    // 5. Handle Business Rule Conflicts (409)
+    // 6. Handle Business Rule Conflicts (409)
     @ExceptionHandler(
         UserAlreadyExistsException::class,
         EventNotPublishedException::class,
@@ -131,7 +155,7 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.CONFLICT)
     }
 
-    // 6. Handle Rate Limit (429)
+    // 7. Handle Rate Limit (429)
     @ExceptionHandler(RateLimitExceededException::class)
     fun handleRateLimit(ex: RateLimitExceededException, request: WebRequest): ResponseEntity<ApiErrorResponse> {
         val errorResponse = ApiErrorResponse(
@@ -143,7 +167,7 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.TOO_MANY_REQUESTS)
     }
 
-    // 7. Handle Everything Else (500)
+    // 8. Handle Everything Else (500)
     @ExceptionHandler(Exception::class)
     fun handleGlobalException(ex: Exception, request: WebRequest): ResponseEntity<ApiErrorResponse> {
         // Log the real error internally so you can debug it later

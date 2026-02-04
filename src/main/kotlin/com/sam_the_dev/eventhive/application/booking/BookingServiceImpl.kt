@@ -4,21 +4,19 @@ import com.sam_the_dev.eventhive.api.dto.BookingDTO
 import com.sam_the_dev.eventhive.api.dto.CreateBookingRequest
 import com.sam_the_dev.eventhive.api.dto.PaymentWebhookPayload
 import com.sam_the_dev.eventhive.api.mapper.toDTO
-import com.sam_the_dev.eventhive.domain.booking.Booking
-import com.sam_the_dev.eventhive.domain.booking.BookingService
-import com.sam_the_dev.eventhive.domain.booking.BookingStatus
-import com.sam_the_dev.eventhive.domain.booking.error.BookingNotFoundException
-import com.sam_the_dev.eventhive.domain.booking.error.InsufficientSeatsException
-import com.sam_the_dev.eventhive.domain.booking.error.ResourceAccessDeniedException
+import com.sam_the_dev.eventhive.domain.booking.*
+import com.sam_the_dev.eventhive.domain.booking.error.*
 import com.sam_the_dev.eventhive.domain.booking.event.BookingSuccessEvent
 import com.sam_the_dev.eventhive.domain.event.EventStatus
 import com.sam_the_dev.eventhive.domain.event.error.EventAlreadyStartedException
 import com.sam_the_dev.eventhive.domain.event.error.EventNotFoundException
 import com.sam_the_dev.eventhive.domain.event.error.EventNotPublishedException
+import com.sam_the_dev.eventhive.domain.event.error.UnauthorizedEventAccessException
 import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
 import com.sam_the_dev.eventhive.infrastructure.persistence.booking.BookingRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.booking.toDomain
 import com.sam_the_dev.eventhive.infrastructure.persistence.booking.toEntity
+import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventEntity
 import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.event.toDomain
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserRepository
@@ -33,6 +31,7 @@ import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
+import java.time.ZoneId
 
 @Service
 class BookingServiceImpl(
@@ -115,7 +114,7 @@ class BookingServiceImpl(
 
             // 8. Return DTO
             return booking
-        }catch (e: Exception){
+        } catch (e: Exception) {
             logger.error("Failed to save booking: ${e.message}")
             throw RuntimeException("Failed to save booking: ${e.message}")
         }
@@ -131,13 +130,18 @@ class BookingServiceImpl(
         val bookingsPage = bookingRepository.findByUserId(user.id!!, pageable)
 
         // 3. Map Entity -> DTO
-        return bookingsPage.map {
-            booking -> booking.toDomain().toDTO()
+        return bookingsPage.map { booking ->
+            booking.toDomain().toDTO()
         }
     }
 
     @Transactional
-    override fun updateBookingStatus(bookingId: Long, newStatus: BookingStatus, userEmail: String, isAdmin: Boolean): BookingDTO {
+    override fun updateBookingStatus(
+        bookingId: Long,
+        newStatus: BookingStatus,
+        userEmail: String,
+        isAdmin: Boolean
+    ): BookingDTO {
         val booking = bookingRepository.findById(bookingId)
             .orElseThrow { BookingNotFoundException("Booking not found") }
 
@@ -159,14 +163,14 @@ class BookingServiceImpl(
         // Case A: Cancelling a valid booking -> RESTORE SEATS
         if (oldStatus != BookingStatus.CANCELLED && newStatus == BookingStatus.CANCELLED) {
             event.availableSeats += booking.ticketsCount
-                eventRepository.save(event)
+            eventRepository.save(event)
         }
 
         // Case B: Re-activating a canceled booking (Admin only) -> DEDUCT SEATS
         // We must check if seats are still available!
         if (oldStatus == BookingStatus.CANCELLED && newStatus == BookingStatus.CONFIRMED) {
             if (event.availableSeats < booking.ticketsCount) {
-                throw InsufficientSeatsException(booking.ticketsCount,event.availableSeats)
+                throw InsufficientSeatsException(booking.ticketsCount, event.availableSeats)
             }
             event.availableSeats -= booking.ticketsCount
             eventRepository.save(event)
@@ -201,6 +205,57 @@ class BookingServiceImpl(
                 bookingRepository.save(booking)
                 logger.info("Booking ${booking.bookingReference} cancelled due to payment failure.")
             }
+        }
+    }
+
+    @Transactional
+    override fun checkInAttendee(request: CheckInRequest, userEmail: String): CheckInResponse {
+        // 1. Find Booking and Event
+        val booking = bookingRepository.findByBookingReference(request.bookingReference)
+            ?: throw BookingNotFoundException(CheckInResponse(false, "Invalid Ticket Reference").toString())
+
+
+        // 2. Check Permissions (Ensure logged-in organizer owns this event)
+        validateOwnership(booking.event,userEmail)
+
+        // 3. Check Status
+        if (booking.status == BookingStatus.CHECKED_IN) {
+            throw TicketAlreadyUsedException(
+                CheckInResponse(
+                    false,
+                    "Ticket already used",
+                    booking.user.username,
+                    "General",
+                    booking.updatedAt.atZone(ZoneId.systemDefault())
+                        .toLocalDateTime()
+                ).toString()
+            )
+        }
+
+        if (booking.status != BookingStatus.CONFIRMED) {
+            throw TicketInValidException(
+                CheckInResponse(false, "Ticket is ${booking.status} (Not Paid/Cancelled)").toString()
+            )
+        }
+
+        // 4. Mark as Used
+        booking.status = BookingStatus.CHECKED_IN
+        bookingRepository.save(booking)
+
+        return CheckInResponse(
+            true,
+            "Check-in Successful",
+            booking.user.username,
+            "General",
+            booking.updatedAt.atZone(ZoneId.systemDefault())
+                .toLocalDateTime()
+        )
+    }
+
+    private fun validateOwnership(event: EventEntity, userEmail: String) {
+
+        if (event.organizer.email != userEmail && event.organizer.username != userEmail) {
+            throw UnauthorizedEventAccessException("Access Denied: You are not the organizer of this event or admin.")
         }
     }
 }
