@@ -5,6 +5,7 @@ import com.sam_the_dev.eventhive.api.dto.EventDTO
 import com.sam_the_dev.eventhive.api.dto.EventSearchCriteria
 import com.sam_the_dev.eventhive.api.dto.UpdateEventRequest
 import com.sam_the_dev.eventhive.api.mapper.toDTO
+import com.sam_the_dev.eventhive.domain.event.Event
 import com.sam_the_dev.eventhive.domain.event.EventService
 import com.sam_the_dev.eventhive.domain.event.EventStatus
 import com.sam_the_dev.eventhive.domain.event.error.*
@@ -31,7 +32,7 @@ class EventServiceImpl(
     private val logger = LoggerFactory.getLogger(EventServiceImpl::class.java)
 
     @Transactional
-    override fun createEvent(request: CreateEventRequest): EventDTO {
+    override fun createEvent(request: CreateEventRequest): Event {
         val organizerEmail = request.organizerEmail
 
         val organizer = userRepository.findByUsernameOrEmail(organizerEmail, organizerEmail)
@@ -55,7 +56,7 @@ class EventServiceImpl(
 
         try {
             val savedEvent = eventRepository.save(eventEntity)
-            return savedEvent.toDomain().toDTO()
+            return savedEvent.toDomain()
         } catch (e: Exception) {
             logger.error("Failed to create event: ${e.message}")
             throw RuntimeException("Failed to create event: ${e.message}")

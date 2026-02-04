@@ -50,7 +50,7 @@ class BookingServiceImpl(
         maxAttempts = 3,
         backoff = Backoff(delay = 50)
     )
-    override fun createBooking(request: CreateBookingRequest, userEmail: String): BookingDTO {
+    override fun createBooking(request: CreateBookingRequest, userEmail: String): Booking {
         logger.info("Attempting to book tickets for event ID: ${request.eventId}")
 
         // 1. Fetch User
@@ -102,11 +102,11 @@ class BookingServiceImpl(
             val savedBooking = bookingRepository.save(bookingEntity)
 
 
-            val booking = savedBooking.toDomain().toDTO()
+            val booking = savedBooking.toDomain()
 
             eventPublisher.publishEvent(
                 BookingSuccessEvent(
-                    booking = booking,
+                    booking = booking.toDTO(),
                     userEmail = userEmail
                 )
             )

@@ -26,7 +26,7 @@ class UserServiceImpl(
     private val logger = LoggerFactory.getLogger(UserServiceImpl::class.java)
 
     @Transactional
-    override fun registerUser(user: RegisterUserDTO): UserDTO {
+    override fun registerUser(user: RegisterUserDTO): User {
         // Check if user with username or email already exists
         val existingUser = userRepository.findByUsernameOrEmail(user.username, user.email)
         if (existingUser != null) {
@@ -67,7 +67,7 @@ class UserServiceImpl(
             // Save the user to the database and return the saved user
             val savedUser = userRepository.save(newUserEntity)
             logger.info("User registered successfully: ${savedUser.username}")
-            return savedUser.toDomain().toDTO()
+            return savedUser.toDomain()
         } catch (e: Exception) {
             logger.error("Error registering user: ${e.message}")
             throw Exception("Failed to register user", e)

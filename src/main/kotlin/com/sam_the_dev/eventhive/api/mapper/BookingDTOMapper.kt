@@ -1,6 +1,7 @@
 package com.sam_the_dev.eventhive.api.mapper
 
 import com.sam_the_dev.eventhive.api.dto.BookingDTO
+import com.sam_the_dev.eventhive.api.utils.sanitizeForHtml
 import com.sam_the_dev.eventhive.domain.booking.Booking
 
 fun Booking.toDTO(): BookingDTO =
@@ -8,12 +9,12 @@ fun Booking.toDTO(): BookingDTO =
         bookingId = requireNotNull(id) { "Booking ID cannot be null when converting to DTO" },
         bookingReference = bookingReference,
         eventId = eventId,
-        eventTitle = eventTitle,
+        eventTitle = sanitizeForHtml(eventTitle),
         ticketsCount = ticketsCount,
         totalPrice = totalPrice,
         status = status,
         bookedAt = createdAt,
-        eventDescription = eventDescription,
+        eventDescription = sanitizeForHtml(eventDescription),
         eventDate = eventDate,
-        eventLocation = eventLocation
+        eventLocation = sanitizeForHtml(eventLocation)
     )

@@ -44,6 +44,7 @@ dependencies {
 	implementation("org.liquibase:liquibase-core")
 	implementation("io.jsonwebtoken:jjwt-api:0.13.0")
 	implementation("com.bucket4j:bucket4j_jdk17-core:8.16.0")
+	implementation("org.owasp.encoder:encoder:1.4.0")
 	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.13.0")
 	runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
