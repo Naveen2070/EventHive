@@ -12,6 +12,10 @@ fun BookingEntity.toDomain(): Booking =
         userId = user.id!!,
         eventId = event.id!!,
         eventTitle = event.title,
+        eventDescription = event.description,
+        eventDate = event.startDate.atZone(ZoneId.systemDefault()).toInstant(),
+        eventEndDate = event.endDate.atZone(ZoneId.systemDefault()).toInstant(),
+        eventLocation =event.location,
         ticketsCount = ticketsCount,
         totalPrice = totalPrice,
         status = status,
@@ -20,9 +24,6 @@ fun BookingEntity.toDomain(): Booking =
         updatedAt = updatedAt,
         isActive = isActive,
         isDeleted = isDeleted,
-        eventDescription = event.description,
-        eventDate = event.startDate.atZone(ZoneId.systemDefault()).toInstant(),
-        eventLocation =event.location
     )
 
 fun Booking.toEntity(

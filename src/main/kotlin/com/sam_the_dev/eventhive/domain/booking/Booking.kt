@@ -15,6 +15,7 @@ class Booking(
     val eventTitle: String,
     val eventDescription: String,
     val eventDate: Instant,
+    val eventEndDate: Instant,
     val eventLocation: String,
     val ticketsCount: Int,
     val totalPrice: BigDecimal,
@@ -38,6 +39,10 @@ class Booking(
                 userId = user.id!!,
                 eventId = event.id!!,
                 eventTitle = event.title,
+                eventDescription = event.description,
+                eventEndDate = event.endDate.atZone(ZoneId.systemDefault()).toInstant(),
+                eventDate = event.startDate.atZone(ZoneId.systemDefault()).toInstant(),
+                eventLocation = event.location,
                 ticketsCount = ticketsCount,
                 totalPrice = pricePerTicket * BigDecimal(ticketsCount),
                 status = BookingStatus.PENDING_PAYMENT,
@@ -45,10 +50,7 @@ class Booking(
                 createdAt = Instant.now(),
                 updatedAt = Instant.now(),
                 isActive = true,
-                isDeleted = false,
-                eventDescription = event.description,
-                eventDate = event.startDate.atZone(ZoneId.systemDefault()).toInstant(),
-                eventLocation = event.location
+                isDeleted = false
             )
         }
     }

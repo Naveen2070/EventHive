@@ -10,11 +10,12 @@ fun Booking.toDTO(): BookingDTO =
         bookingReference = bookingReference,
         eventId = eventId,
         eventTitle = sanitizeForHtml(eventTitle),
+        eventDescription = sanitizeForHtml(eventDescription),
+        eventDate = eventDate,
+        eventEndDate = eventEndDate,
+        eventLocation = sanitizeForHtml(eventLocation),
         ticketsCount = ticketsCount,
         totalPrice = totalPrice,
         status = status,
-        bookedAt = createdAt,
-        eventDescription = sanitizeForHtml(eventDescription),
-        eventDate = eventDate,
-        eventLocation = sanitizeForHtml(eventLocation)
+        bookedAt = createdAt
     )

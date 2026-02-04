@@ -12,6 +12,7 @@ data class BookingDTO(
     val eventTitle: String,
     val eventDescription: String,
     val eventDate: Instant,
+    val eventEndDate: Instant,
     val eventLocation: String,
     val ticketsCount: Int,
     val totalPrice: BigDecimal,
