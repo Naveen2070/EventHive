@@ -5,19 +5,18 @@ import com.sam_the_dev.eventhive.api.dto.CreateBookingRequest
 import com.sam_the_dev.eventhive.api.dto.PaymentWebhookPayload
 import com.sam_the_dev.eventhive.api.mapper.toDTO
 import com.sam_the_dev.eventhive.domain.booking.*
-import com.sam_the_dev.eventhive.domain.booking.error.*
+import com.sam_the_dev.eventhive.domain.booking.error.BookingNotFoundException
+import com.sam_the_dev.eventhive.domain.booking.error.InsufficientSeatsException
+import com.sam_the_dev.eventhive.domain.booking.error.ResourceAccessDeniedException
 import com.sam_the_dev.eventhive.domain.booking.event.BookingSuccessEvent
 import com.sam_the_dev.eventhive.domain.event.EventStatus
-import com.sam_the_dev.eventhive.domain.event.error.EventAlreadyStartedException
-import com.sam_the_dev.eventhive.domain.event.error.EventNotFoundException
-import com.sam_the_dev.eventhive.domain.event.error.EventNotPublishedException
-import com.sam_the_dev.eventhive.domain.event.error.UnauthorizedEventAccessException
+import com.sam_the_dev.eventhive.domain.event.error.*
 import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
 import com.sam_the_dev.eventhive.infrastructure.persistence.booking.BookingRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.booking.toDomain
 import com.sam_the_dev.eventhive.infrastructure.persistence.booking.toEntity
-import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventEntity
 import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventRepository
+import com.sam_the_dev.eventhive.infrastructure.persistence.event.TicketTierRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.event.toDomain
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.toDomain
@@ -30,6 +29,7 @@ import org.springframework.retry.annotation.Backoff
 import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 
@@ -38,6 +38,7 @@ class BookingServiceImpl(
     private val bookingRepository: BookingRepository,
     private val eventRepository: EventRepository,
     private val userRepository: UserRepository,
+    private val ticketTierRepository: TicketTierRepository,
     private val eventPublisher: ApplicationEventPublisher
 ) : BookingService {
 
@@ -60,35 +61,45 @@ class BookingServiceImpl(
         val eventEntity = eventRepository.findById(request.eventId)
             .orElseThrow { EventNotFoundException("Event not found") }
 
-        // 3. Domain Logic Checks
+        // 3. Fetch Ticket Tier (Fresh copy on every retry attempt)
+        val tierEntity = ticketTierRepository.findById(request.ticketTierId)
+            .orElseThrow { TicketTierNotFoundException("Ticket Tier not found") }
+
+        // 3.1 Check if the ticket tier belongs to the event
+        if (tierEntity.event.id != eventEntity.id) {
+            throw InvalidTicketTierException("Ticket Tier does not belong to this Event")
+        }
+
+        // 4. Domain Logic Checks
         if (eventEntity.status != EventStatus.PUBLISHED) {
             throw EventNotPublishedException(eventEntity.title)
         }
-        if (eventEntity.startDate.isBefore(LocalDateTime.now())) {
-            throw EventAlreadyStartedException(eventEntity.title)
+        if (eventEntity.endDate.isBefore(LocalDateTime.now())) {
+            throw EventAlreadyStartedException("Event has ended")
         }
 
-        // 4. Check Availability (The logic that might fail concurrently)
-        if (eventEntity.availableSeats < request.ticketsCount) {
-            throw InsufficientSeatsException(request.ticketsCount, eventEntity.availableSeats)
+        // 5. Check Availability (The logic that might fail concurrently)
+        if (tierEntity.availableAllocation < request.ticketsCount) {
+            throw InsufficientSeatsException(request.ticketsCount, tierEntity.availableAllocation)
         }
 
-        // 5. Create Domain Object (Using your Domain Logic)
+        // 6. Create Domain Object (Using your Domain Logic)
         val bookingDomain = Booking.create(
             user = userEntity.toDomain(),
             event = eventEntity.toDomain(),
+            tier = tierEntity,
             ticketsCount = request.ticketsCount,
-            pricePerTicket = eventEntity.price,
             createdBy = userEntity.id!!
         )
 
-        // 6. Update Inventory (Decrement Seats)
-        // This marks the eventEntity as "dirty". Hibernate checks version upon commit.
-        eventEntity.availableSeats -= request.ticketsCount
+        // 7. Update Inventory (Decrement Seats)
+        // This marks the tierEntity as "dirty". Hibernate checks version upon commit.
+        tierEntity.availableAllocation -= request.ticketsCount
 
-        // 7. Save to DB
+        // 8. Save to DB
         // Save Event (triggers version increment)
         try {
+            ticketTierRepository.save(tierEntity)
             eventRepository.save(eventEntity)
         } catch (e: Exception) {
             logger.error("Failed to save event: ${e.message}")
@@ -97,7 +108,7 @@ class BookingServiceImpl(
 
         try {
             // Convert Domain -> Entity and Save Booking
-            val bookingEntity = bookingDomain.toEntity(userEntity, eventEntity)
+            val bookingEntity = bookingDomain.toEntity(userEntity, eventEntity, tierEntity)
             val savedBooking = bookingRepository.save(bookingEntity)
 
 
@@ -112,7 +123,7 @@ class BookingServiceImpl(
 
             logger.info("Booking successful: ${savedBooking.bookingReference}")
 
-            // 8. Return DTO
+            // 9. Return DTO
             return booking
         } catch (e: Exception) {
             logger.error("Failed to save booking: ${e.message}")
@@ -158,29 +169,35 @@ class BookingServiceImpl(
 
         // 2. Logic: Handle Inventory Changes
         val oldStatus = booking.status
-        val event = booking.event
+        val tier = booking.ticketTier
 
-        // Case A: Cancelling a valid booking -> RESTORE SEATS
-        if (oldStatus != BookingStatus.CANCELLED && newStatus == BookingStatus.CANCELLED) {
-            event.availableSeats += booking.ticketsCount
-            eventRepository.save(event)
-        }
-
-        // Case B: Re-activating a canceled booking (Admin only) -> DEDUCT SEATS
-        // We must check if seats are still available!
-        if (oldStatus == BookingStatus.CANCELLED && newStatus == BookingStatus.CONFIRMED) {
-            if (event.availableSeats < booking.ticketsCount) {
-                throw InsufficientSeatsException(booking.ticketsCount, event.availableSeats)
+        try {
+            // Case A: Cancelling a valid booking -> RESTORE SEATS
+            if (oldStatus != BookingStatus.CANCELLED && newStatus == BookingStatus.CANCELLED) {
+                tier.availableAllocation += booking.ticketsCount
+                ticketTierRepository.save(tier)
             }
-            event.availableSeats -= booking.ticketsCount
-            eventRepository.save(event)
+
+            // Case B: Re-activating a canceled booking (Admin only) -> DEDUCT SEATS
+            // We must check if seats are still available!
+            if (oldStatus == BookingStatus.CANCELLED && newStatus == BookingStatus.CONFIRMED) {
+                if (tier.availableAllocation < booking.ticketsCount) {
+                    throw InsufficientSeatsException(booking.ticketsCount, tier.availableAllocation)
+                }
+                tier.availableAllocation -= booking.ticketsCount
+                ticketTierRepository.save(tier)
+            }
+
+            // 3. Update & Save
+            booking.status = newStatus
+            val savedBooking = bookingRepository.save(booking)
+
+            return savedBooking.toDomain().toDTO()
+        }catch (e: Exception){
+            logger.error("Failed to update booking status: ${e.message}")
+            throw RuntimeException("Failed to update booking status: ${e.message}")
         }
 
-        // 3. Update & Save
-        booking.status = newStatus
-        val savedBooking = bookingRepository.save(booking)
-
-        return savedBooking.toDomain().toDTO()
     }
 
     @Transactional
@@ -200,62 +217,80 @@ class BookingServiceImpl(
             // Payment failed -> Cancel booking and free up seats
             if (booking.status != BookingStatus.CANCELLED) {
                 booking.status = BookingStatus.CANCELLED
-                booking.event.availableSeats += booking.ticketsCount
-                eventRepository.save(booking.event)
+                val tier = booking.ticketTier
+                tier.availableAllocation += booking.ticketsCount
+                ticketTierRepository.save(tier)
                 bookingRepository.save(booking)
-                logger.info("Booking ${booking.bookingReference} cancelled due to payment failure.")
+                logger.info("Booking ${booking.bookingReference} cancelled due to payment failure. Inventory restored to tier ${tier.name}.")
             }
         }
     }
 
     @Transactional
     override fun checkInAttendee(request: CheckInRequest, userEmail: String): CheckInResponse {
-        // 1. Find Booking and Event
         val booking = bookingRepository.findByBookingReference(request.bookingReference)
-            ?: throw BookingNotFoundException(CheckInResponse(false, "Invalid Ticket Reference").toString())
+            ?: throw BookingNotFoundException("Invalid Ticket Reference")
 
+        // 1. Ownership Check
+        if (booking.event.organizer.email != userEmail && booking.event.organizer.username != userEmail) {
+            throw UnauthorizedEventAccessException("Access Denied")
+        }
 
-        // 2. Check Permissions (Ensure logged-in organizer owns this event)
-        validateOwnership(booking.event,userEmail)
+        val now = LocalDateTime.now()
+        val tier = booking.ticketTier
 
-        // 3. Check Status
-        if (booking.status == BookingStatus.CHECKED_IN) {
-            throw TicketAlreadyUsedException(
-                CheckInResponse(
-                    false,
-                    "Ticket already used",
-                    booking.user.username,
-                    "General",
-                    booking.updatedAt.atZone(ZoneId.systemDefault())
-                        .toLocalDateTime()
-                ).toString()
+        // 2. Validate Payment Status
+        if (booking.status != BookingStatus.CONFIRMED && booking.status != BookingStatus.CHECKED_IN) {
+            return CheckInResponse(false, "Ticket status is ${booking.status}", booking.user.username, tier.name)
+        }
+
+        // 3. Date/Time Validation (Multi-Day Logic)
+        if (now.isBefore(tier.validFrom)) {
+            return CheckInResponse(false, "Ticket valid from ${tier.validFrom}", booking.user.username, tier.name)
+        }
+        if (now.isAfter(tier.validUntil)) {
+            booking.status = BookingStatus.EXPIRED
+            bookingRepository.save(booking)
+            return CheckInResponse(false, "Ticket Expired", booking.user.username, tier.name)
+        }
+
+        // 4. Re-Entry Logic
+        // Convert Instant to LocalDate (system default zone) to check "Same Day"
+        val lastCheckInInstant = booking.lastCheckedInAt
+        val isReEntry = if (lastCheckInInstant != null) {
+            val lastDate = lastCheckInInstant.atZone(ZoneId.systemDefault()).toLocalDate()
+            val today = now.toLocalDate()
+            lastDate.isEqual(today)
+        } else false
+
+        if (isReEntry) {
+            return CheckInResponse(
+                true,
+                "Re-entry Verified (Already checked in today)",
+                booking.user.username,
+                tier.name,
+                LocalDateTime.ofInstant(booking.lastCheckedInAt, ZoneId.systemDefault())
             )
         }
 
-        if (booking.status != BookingStatus.CONFIRMED) {
-            throw TicketInValidException(
-                CheckInResponse(false, "Ticket is ${booking.status} (Not Paid/Cancelled)").toString()
-            )
+        // 5. Process New Check-in
+        try {
+            booking.status = BookingStatus.CHECKED_IN
+            booking.lastCheckedInAt = Instant.now()
+            booking.checkInCount += 1
+            bookingRepository.save(booking)
+        } catch (e: Exception) {
+            logger.error("Failed to check in attendee: ${e.message}")
+            throw RuntimeException("Failed to check in attendee: ${e.message}")
         }
-
-        // 4. Mark as Used
-        booking.status = BookingStatus.CHECKED_IN
-        bookingRepository.save(booking)
 
         return CheckInResponse(
             true,
             "Check-in Successful",
             booking.user.username,
-            "General",
-            booking.updatedAt.atZone(ZoneId.systemDefault())
-                .toLocalDateTime()
+            tier.name,
+            LocalDateTime.now()
         )
     }
 
-    private fun validateOwnership(event: EventEntity, userEmail: String) {
-
-        if (event.organizer.email != userEmail && event.organizer.username != userEmail) {
-            throw UnauthorizedEventAccessException("Access Denied: You are not the organizer of this event or admin.")
-        }
-    }
 }

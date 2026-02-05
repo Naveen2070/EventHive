@@ -10,6 +10,7 @@ data class BookingDTO(
     val bookingReference: String,
     val eventId: Long,
     val eventTitle: String,
+    val ticketTierName: String,
     val eventDescription: String,
     val eventDate: Instant,
     val eventEndDate: Instant,
@@ -24,6 +25,9 @@ data class CreateBookingRequest(
     @field:NotNull(message = "Event ID is required")
     @field:Positive(message = "Event ID must be positive")
     var eventId: Long,
+
+    @field:NotNull(message = "Ticket Tier ID is required")
+    var ticketTierId: Long,
 
     @field:NotNull(message = "Tickets count is required")
     @field:Min(value = 1, message = "At least 1 ticket must be booked")

@@ -26,8 +26,8 @@ class OpenApiConfig {
                     .version("1.0.0")
                     .contact(
                         Contact()
-                            .name("Sam the Dev")
-                            .email("sam@eventhive.com")
+                            .name("Naveen")
+                            .email("naveenrameshcud@gmail.com")
                             .url("https://github.com/Naveen2070/EventHive")
                     )
             )

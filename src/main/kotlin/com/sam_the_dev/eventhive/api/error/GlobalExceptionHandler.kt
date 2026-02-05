@@ -9,8 +9,7 @@ import com.sam_the_dev.eventhive.domain.booking.error.TicketAlreadyUsedException
 import com.sam_the_dev.eventhive.domain.booking.error.TicketInValidException
 import com.sam_the_dev.eventhive.domain.event.error.*
 import com.sam_the_dev.eventhive.domain.role.error.RoleNotFoundException
-import com.sam_the_dev.eventhive.domain.user.error.UserAlreadyExistsException
-import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
+import com.sam_the_dev.eventhive.domain.user.error.*
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -30,7 +29,8 @@ class GlobalExceptionHandler {
     @ExceptionHandler(
         UserNotFoundException::class,
         RoleNotFoundException::class,
-        EventNotFoundException::class
+        EventNotFoundException::class,
+        TicketTierNotFoundException::class
     )
     fun handleNotFound(ex: RuntimeException, request: WebRequest): ResponseEntity<ApiErrorResponse> {
         val errorResponse = ApiErrorResponse(
@@ -72,7 +72,11 @@ class GlobalExceptionHandler {
     // 3. Handle ticket validation (400)
     @ExceptionHandler(
         TicketAlreadyUsedException::class,
-        TicketInValidException::class
+        TicketInValidException::class,
+        InvalidTicketTierException::class,
+        InvalidResetTokenException::class,
+        ExpiredResetTokenException::class,
+        InvalidOldPasswordException::class,
     )
     fun handleInValidTicket(
         ex: RuntimeException,
@@ -93,7 +97,8 @@ class GlobalExceptionHandler {
     @ExceptionHandler(
         InvalidCredentialsException::class,
         TokenExpiredException::class,
-        UnauthorizedUserException::class
+        UnauthorizedUserException::class,
+        UnauthorizedUserAccessException::class
     )
     fun handleInvalidCredentials(
         ex: RuntimeException,

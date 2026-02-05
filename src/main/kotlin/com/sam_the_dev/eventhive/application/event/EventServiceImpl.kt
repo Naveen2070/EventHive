@@ -8,12 +8,12 @@ import com.sam_the_dev.eventhive.api.mapper.toDTO
 import com.sam_the_dev.eventhive.domain.event.Event
 import com.sam_the_dev.eventhive.domain.event.EventService
 import com.sam_the_dev.eventhive.domain.event.EventStatus
-import com.sam_the_dev.eventhive.domain.event.error.*
+import com.sam_the_dev.eventhive.domain.event.error.EventDateChangeNotAllowedException
+import com.sam_the_dev.eventhive.domain.event.error.EventModificationNotAllowedException
+import com.sam_the_dev.eventhive.domain.event.error.EventNotFoundException
+import com.sam_the_dev.eventhive.domain.event.error.UnauthorizedEventAccessException
 import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
-import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventEntity
-import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventRepository
-import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventSpecification
-import com.sam_the_dev.eventhive.infrastructure.persistence.event.toDomain
+import com.sam_the_dev.eventhive.infrastructure.persistence.event.*
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.toDomain
 import org.slf4j.LoggerFactory
@@ -45,14 +45,25 @@ class EventServiceImpl(
             startDate = request.startDate,
             endDate = request.endDate,
             location = request.location,
-            price = request.price,
-            totalSeats = request.totalSeats,
-            availableSeats = request.totalSeats,
             status = EventStatus.DRAFT,
             organizer = organizer,
             createdBy = organizer.id ?: request.createdBy,
             updatedBy = organizer.id ?: request.createdBy,
         )
+
+        val tiers = request.ticketTiers.map { tierReq ->
+            TicketTierEntity(
+                name = tierReq.name,
+                price = tierReq.price,
+                totalAllocation = tierReq.totalAllocation,
+                availableAllocation = tierReq.totalAllocation,
+                validFrom = tierReq.validFrom,
+                validUntil = tierReq.validUntil,
+                event = eventEntity
+            )
+        }
+
+        eventEntity.ticketTiers.addAll(tiers)
 
         try {
             val savedEvent = eventRepository.save(eventEntity)
@@ -95,8 +106,8 @@ class EventServiceImpl(
         // 1. Security Check: Ownership
         validateOwnership(event, userEmail, isAdmin)
 
-        // 2. 🛡️ Business Rule: Cannot change dates if tickets are sold
-        val hasSoldTickets = event.totalSeats != event.availableSeats
+        // 2. Business Rule: Cannot change dates if tickets are sold
+        val hasSoldTickets = event.ticketTiers.any { it.totalAllocation != it.availableAllocation }
 
         if (hasSoldTickets) {
             if (request.startDate != null || request.endDate != null) {
@@ -109,23 +120,10 @@ class EventServiceImpl(
         request.title?.let { event.title = it }
         request.description?.let { event.description = it }
         request.location?.let { event.location = it }
-        request.price?.let { event.price = it }
 
         // Apply Dates (Only if no tickets sold, or if they passed the check above)
         request.startDate?.let { event.startDate = it }
         request.endDate?.let { event.endDate = it }
-
-        request.totalSeats?.let { newTotal ->
-            if (hasSoldTickets && newTotal < (event.totalSeats - event.availableSeats)) {
-                // Prevent reducing total seats below the number of currently sold tickets
-                throw InsufficientSeatCapacityException("Cannot reduce total seats below the number of already sold tickets.")
-            }
-            // Adjust available seats logic:
-            // logic: diff = newTotal - oldTotal. available += diff
-            val diff = newTotal - event.totalSeats
-            event.totalSeats = newTotal
-            event.availableSeats += diff
-        }
 
         try {
             val savedEvent = eventRepository.save(event)
@@ -148,7 +146,7 @@ class EventServiceImpl(
 
         validateOwnership(event, userEmail, isAdmin)
 
-        val hasSoldTickets = event.totalSeats != event.availableSeats
+        val hasSoldTickets = event.ticketTiers.any { it.totalAllocation != it.availableAllocation }
         // Rule 1: If tickets are sold, you CANNOT go back to DRAFT.
         // But you CAN go to CANCELLED or COMPLETED.
         if (hasSoldTickets && status == EventStatus.DRAFT) {
@@ -202,7 +200,7 @@ class EventServiceImpl(
     }
 
     private fun assertEventNotLocked(event: EventEntity) {
-        val hasSoldTickets = event.totalSeats != event.availableSeats
+        val hasSoldTickets = event.ticketTiers.any { it.totalAllocation != it.availableAllocation }
         val hasStarted = event.startDate.atZone(ZoneId.systemDefault()).toInstant().isBefore(Instant.now())
         val isPublished = event.status == EventStatus.PUBLISHED
 
