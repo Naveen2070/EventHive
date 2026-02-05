@@ -63,7 +63,6 @@ src/main/kotlin/com/sam_the_dev/eventhive
 ```bash
 git clone https://github.com/Naveen2070/EventHive.git
 cd EventHive
-
 ```
 
 ### 2. Run with Docker (Recommended)
@@ -72,7 +71,6 @@ The easiest way to run the application (App + Database) is using Docker Compose:
 
 ```bash
 docker-compose up --build
-
 ```
 
 The API will be available at `http://localhost:8080`.
@@ -85,14 +83,12 @@ If you want to run it locally for development:
 
 ```bash
 docker run --name eventhive-db -e POSTGRES_USER=admin -e POSTGRES_PASSWORD=password -e POSTGRES_DB=eventhive -p 5432:5432 -d postgres:15-alpine
-
 ```
 
 ##### 2. Run the app:
 
 ```bash
 ./gradlew bootRun
-
 ```
 
 *Liquibase will automatically migrate the schema (including the new `ticket_tiers` and `password_reset_tokens` tables) on startup.*
