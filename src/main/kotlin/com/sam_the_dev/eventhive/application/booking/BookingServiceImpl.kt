@@ -1,10 +1,11 @@
 package com.sam_the_dev.eventhive.application.booking
 
-import com.sam_the_dev.eventhive.api.dto.BookingDTO
-import com.sam_the_dev.eventhive.api.dto.CreateBookingRequest
-import com.sam_the_dev.eventhive.api.dto.PaymentWebhookPayload
+import com.sam_the_dev.eventhive.api.dto.*
 import com.sam_the_dev.eventhive.api.mapper.toDTO
-import com.sam_the_dev.eventhive.domain.booking.*
+import com.sam_the_dev.eventhive.domain.booking.Booking
+import com.sam_the_dev.eventhive.domain.booking.BookingService
+import com.sam_the_dev.eventhive.domain.booking.BookingStatus
+import com.sam_the_dev.eventhive.domain.booking.CheckInStatus
 import com.sam_the_dev.eventhive.domain.booking.error.BookingNotFoundException
 import com.sam_the_dev.eventhive.domain.booking.error.InsufficientSeatsException
 import com.sam_the_dev.eventhive.domain.booking.error.ResourceAccessDeniedException
@@ -32,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 
 @Service
 class BookingServiceImpl(
@@ -231,65 +233,85 @@ class BookingServiceImpl(
         val booking = bookingRepository.findByBookingReference(request.bookingReference)
             ?: throw BookingNotFoundException("Invalid Ticket Reference")
 
-        // 1. Ownership Check
-        if (booking.event.organizer.email != userEmail && booking.event.organizer.username != userEmail) {
-            throw UnauthorizedEventAccessException("Access Denied")
+        // 1. Ownership Check (Organizer Only)
+        // We check if the logged-in user (userEmail) owns the event
+        if (booking.event.organizer.email != userEmail) {
+            throw UnauthorizedEventAccessException("Access Denied: You are not the organizer.")
         }
 
-        val now = LocalDateTime.now()
+        val now = Instant.now()
         val tier = booking.ticketTier
 
         // 2. Validate Payment Status
         if (booking.status != BookingStatus.CONFIRMED && booking.status != BookingStatus.CHECKED_IN) {
-            return CheckInResponse(false, "Ticket status is ${booking.status}", booking.user.username, tier.name)
+            return CheckInResponse(
+                success = false,
+                status = CheckInStatus.INVALID_STATUS,
+                message = "Ticket status is ${booking.status}",
+                attendeeName = booking.user.username,
+                ticketTierName = tier.name
+            )
         }
 
-        // 3. Date/Time Validation (Multi-Day Logic)
-        if (now.isBefore(tier.validFrom)) {
-            return CheckInResponse(false, "Ticket valid from ${tier.validFrom}", booking.user.username, tier.name)
+        // 3. Date/Time Validation (using Instant comparison)
+        if (now.isBefore(tier.validFrom.toInstant(ZoneOffset.UTC))) {
+            return CheckInResponse(
+                success = false,
+                status = CheckInStatus.WRONG_DATE,
+                message = "Ticket not valid yet — too early",
+                attendeeName = booking.user.username,
+                ticketTierName = tier.name
+            )
         }
-        if (now.isAfter(tier.validUntil)) {
+        if (now.isAfter(tier.validUntil.toInstant(ZoneOffset.UTC))) {
             booking.status = BookingStatus.EXPIRED
             bookingRepository.save(booking)
-            return CheckInResponse(false, "Ticket Expired", booking.user.username, tier.name)
+            return CheckInResponse(
+                success = false,
+                status = CheckInStatus.EXPIRED,
+                message = "Ticket Expired",
+                attendeeName = booking.user.username,
+                ticketTierName = tier.name
+            )
         }
 
         // 4. Re-Entry Logic
-        // Convert Instant to LocalDate (system default zone) to check "Same Day"
-        val lastCheckInInstant = booking.lastCheckedInAt
-        val isReEntry = if (lastCheckInInstant != null) {
-            val lastDate = lastCheckInInstant.atZone(ZoneId.systemDefault()).toLocalDate()
-            val today = now.toLocalDate()
+        val lastCheckIn = booking.lastCheckedInAt
+        val isReEntry = if (lastCheckIn != null) {
+            val zone = ZoneId.systemDefault()
+            val lastDate = lastCheckIn.atZone(zone).toLocalDate()
+            val today = LocalDateTime.ofInstant(now, zone).toLocalDate()
             lastDate.isEqual(today)
         } else false
 
         if (isReEntry) {
             return CheckInResponse(
-                true,
-                "Re-entry Verified (Already checked in today)",
-                booking.user.username,
-                tier.name,
-                LocalDateTime.ofInstant(booking.lastCheckedInAt, ZoneId.systemDefault())
+                success = true,
+                status = CheckInStatus.ALREADY_CHECKED_IN, // 👈 Frontend uses this to show Yellow Alert
+                message = "Already checked in today",
+                attendeeName = booking.user.username,
+                ticketTierName = tier.name,
+                timestamp = LocalDateTime.ofInstant(booking.lastCheckedInAt, ZoneId.systemDefault())
             )
         }
 
         // 5. Process New Check-in
         try {
             booking.status = BookingStatus.CHECKED_IN
-            booking.lastCheckedInAt = Instant.now()
+            booking.lastCheckedInAt = now
             booking.checkInCount += 1
             bookingRepository.save(booking)
         } catch (e: Exception) {
             logger.error("Failed to check in attendee: ${e.message}")
-            throw RuntimeException("Failed to check in attendee: ${e.message}")
+            throw RuntimeException("Failed to check in attendee")
         }
 
         return CheckInResponse(
-            true,
-            "Check-in Successful",
-            booking.user.username,
-            tier.name,
-            LocalDateTime.now()
+            success = true,
+            status = CheckInStatus.CHECKED_IN,
+            message = "Check-in Successful",
+            attendeeName = booking.user.username,
+            ticketTierName = tier.name
         )
     }
 

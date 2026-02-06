@@ -13,10 +13,10 @@ class EmailService(
 ) {
     private val logger = LoggerFactory.getLogger(EmailService::class.java)
 
-    @Value("\${spring.mail.username}")
+    @Value("\${spring.mail.username:no-reply@eventhive.com}")
     private lateinit var senderEmail: String
 
-    @Value("\${frontend.url}")
+    @Value("\${frontend.url:http://localhost:3001/}")
     private lateinit var frontendUrl: String
 
     fun sendBookingConfirmation(to: String, booking: BookingDTO) {
@@ -87,7 +87,7 @@ class EmailService(
     private fun sendEmail(to: String, subject: String, content: String) {
         try {
             val message = SimpleMailMessage()
-            message.from = senderEmail // "no-reply@eventhive.com"
+            message.from = senderEmail
             message.setTo(to)
             message.subject = subject
             message.text = content

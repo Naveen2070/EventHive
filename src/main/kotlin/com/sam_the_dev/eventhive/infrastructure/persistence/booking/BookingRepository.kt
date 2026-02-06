@@ -16,27 +16,21 @@ interface BookingRepository : JpaRepository<BookingEntity, Long> {
     fun findByEventId(eventId: Long, pageable: Pageable): Page<BookingEntity>
     fun findByBookingReference(bookingReference: String): BookingEntity?
 
-    // Confirmed bookings for organizer
-    @Query("""
-        SELECT b FROM BookingEntity b 
-        JOIN b.event e 
-        WHERE e.organizer.id = :organizerId 
-        AND b.status = com.sam_the_dev.eventhive.domain.booking.BookingStatus.CONFIRMED
-    """)
-    fun findAllConfirmedByOrganizer(organizerId: Long): List<BookingEntity>
+    // --- Dashboard Queries ---
 
-    // --- Projections for Dashboard ---
-
+    // 1. Recent Sales
     @Query("""
         SELECT 
             b.id AS id,
             e.title AS eventName,
+            t.name AS tierName,  
             u.username AS customerName,
             b.ticketsCount AS tickets,
             b.totalPrice AS amount,
             b.createdAt AS date
         FROM BookingEntity b
         JOIN b.event e
+        JOIN b.ticketTier t      
         JOIN b.user u
         WHERE e.organizer.id = :organizerId
         AND b.status = com.sam_the_dev.eventhive.domain.booking.BookingStatus.CONFIRMED
@@ -47,22 +41,23 @@ interface BookingRepository : JpaRepository<BookingEntity, Long> {
         pageable: Pageable
     ): List<RecentSaleProjection>
 
+    // 2. Revenue Trend
     @Query("""
         SELECT 
-            DATE(b.createdAt) AS date,
+            CAST(b.createdAt AS LocalDate) AS date, 
             COALESCE(SUM(b.totalPrice), 0) AS revenue
         FROM BookingEntity b
         JOIN b.event e
         WHERE e.organizer.id = :organizerId
         AND b.status = com.sam_the_dev.eventhive.domain.booking.BookingStatus.CONFIRMED
-        GROUP BY DATE(b.createdAt)
-        ORDER BY DATE(b.createdAt)
+        GROUP BY CAST(b.createdAt AS LocalDate)
+        ORDER BY CAST(b.createdAt AS LocalDate) ASC
     """)
     fun getRevenueTrendProjected(
         organizerId: Long
     ): List<RevenueTrendProjection>
 
-    // Total revenue
+    // 3. Total Revenue
     @Query("""
         SELECT COALESCE(SUM(b.totalPrice), 0)
         FROM BookingEntity b
@@ -72,7 +67,7 @@ interface BookingRepository : JpaRepository<BookingEntity, Long> {
     """)
     fun getTotalRevenue(organizerId: Long): Double
 
-    // Total tickets
+    // 4. Total Tickets Sold (CONFIRMED + PENDING)
     @Query("""
         SELECT COALESCE(SUM(b.ticketsCount), 0)
         FROM BookingEntity b
@@ -85,7 +80,7 @@ interface BookingRepository : JpaRepository<BookingEntity, Long> {
     """)
     fun getTotalTicketsSold(organizerId: Long): Long
 
-    // Pending payment tickets
+    // 5. Pending Payment Count
     @Query("""
         SELECT COALESCE(SUM(b.ticketsCount), 0)
         FROM BookingEntity b
@@ -95,7 +90,7 @@ interface BookingRepository : JpaRepository<BookingEntity, Long> {
     """)
     fun getPendingPaymentTickets(organizerId: Long): Long
 
-    // Tickets sold since a date
+    // 6. Tickets Sold Since (Date Filter)
     @Query("""
         SELECT COALESCE(SUM(b.ticketsCount), 0)
         FROM BookingEntity b
@@ -109,7 +104,7 @@ interface BookingRepository : JpaRepository<BookingEntity, Long> {
         fromDate: Instant
     ): Long
 
-    // Revenue since a date
+    // 7. Revenue Since (Date Filter)
     @Query("""
         SELECT COALESCE(SUM(b.totalPrice), 0)
         FROM BookingEntity b

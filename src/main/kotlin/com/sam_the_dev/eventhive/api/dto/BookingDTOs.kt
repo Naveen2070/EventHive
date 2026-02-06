@@ -1,9 +1,12 @@
 package com.sam_the_dev.eventhive.api.dto
 
+import com.sam_the_dev.eventhive.api.utils.sanitizeForHtml
 import com.sam_the_dev.eventhive.domain.booking.BookingStatus
+import com.sam_the_dev.eventhive.domain.booking.CheckInStatus
 import jakarta.validation.constraints.*
 import java.math.BigDecimal
 import java.time.Instant
+import java.time.LocalDateTime
 
 data class BookingDTO(
     val bookingId: Long,
@@ -50,3 +53,26 @@ data class PaymentWebhookPayload(
     @field:NotBlank(message = "Payment status is required")
     val status: String
 )
+
+data class CheckInRequest(
+    val bookingReference: String
+)
+
+data class CheckInResponse(
+    val success: Boolean,
+    val status: CheckInStatus,
+    val message: String,
+    val attendeeName: String? = null,
+    val ticketTierName: String? = null,
+    val timestamp: LocalDateTime = LocalDateTime.now()
+)
+
+fun CheckInResponse.toSanitized(): CheckInResponse =
+    CheckInResponse(
+        success = success,
+        status = status,
+        message = sanitizeForHtml(message),
+        attendeeName = sanitizeForHtml(attendeeName),
+        ticketTierName = sanitizeForHtml(ticketTierName),
+        timestamp = timestamp
+    )

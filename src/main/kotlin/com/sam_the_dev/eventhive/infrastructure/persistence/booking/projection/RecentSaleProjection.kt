@@ -5,6 +5,7 @@ import java.time.LocalDateTime
 interface RecentSaleProjection {
     val id: Long
     val eventName: String
+    val tierName: String
     val customerName: String
     val tickets: Int
     val amount: Double
