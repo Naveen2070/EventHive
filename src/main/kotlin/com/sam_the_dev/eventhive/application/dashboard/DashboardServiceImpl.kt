@@ -72,6 +72,7 @@ class DashboardServiceImpl(
                 it.id,
                 it.eventName,
                 it.customerName,
+                it.tierName,
                 it.tickets,
                 it.amount,
                 it.date.atZone(ZoneId.systemDefault()).toLocalDateTime()

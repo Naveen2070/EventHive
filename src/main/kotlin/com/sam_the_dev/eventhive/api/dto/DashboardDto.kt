@@ -32,6 +32,7 @@ data class RecentSaleDTO(
     val id: Long,
     val eventName: String,
     val customerName: String,
+    val tierName:String,
     val tickets: Int,
     val amount: Double,
     val date: LocalDateTime
