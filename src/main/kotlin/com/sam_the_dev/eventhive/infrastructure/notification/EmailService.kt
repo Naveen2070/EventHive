@@ -16,7 +16,7 @@ class EmailService(
     @Value("\${spring.mail.username}")
     private lateinit var senderEmail: String
 
-    @Value($$"${frontend.url}")
+    @Value("\${frontend.url}")
     private lateinit var frontendUrl: String
 
     fun sendBookingConfirmation(to: String, booking: BookingDTO) {
