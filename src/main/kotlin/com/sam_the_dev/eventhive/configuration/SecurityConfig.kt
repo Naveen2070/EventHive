@@ -42,7 +42,7 @@ class SecurityConfig(
                         "/scalar.html"
                     ).permitAll()
                     // auth endpoint
-                    .requestMatchers("/api/auth/**").permitAll()
+                    .requestMatchers("/api/auth/**", "/api/user/forgot-password", "/api/user/reset-password").permitAll()
                     // payment webHook
                     .requestMatchers("/api/bookings/webhook/payment").permitAll()
                     // events public endpoints

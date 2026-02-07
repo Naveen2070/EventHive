@@ -172,6 +172,8 @@ class UserServiceImpl(
         )
         passwordResetTokenRepository.save(resetToken)
 
+        logger.info("Password reset initiated for $email")
+
         eventPublisher.publishEvent(
             PasswordResetInitiatedEvent(
                 email = userEntity.email,
