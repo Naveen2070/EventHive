@@ -6,6 +6,12 @@ EventHive is a production-grade REST API designed to handle the full lifecycle o
 
 ---
 
+### 🔗 Frontend Repository
+This API is designed to work with the **EventHive UI**.
+👉 **[View the Frontend Repository here](https://github.com/Naveen2070/EventHive-UI)**
+
+---
+
 ## 🚀 Key Features
 
 * **🔒 Secure Authentication:** JWT-based stateless authentication with custom security filters.
