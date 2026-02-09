@@ -13,7 +13,9 @@ data class TicketTierDTO(
     val totalAllocation: Int,
     val availableAllocation: Int,
     val validFrom: LocalDateTime,
-    val validUntil: LocalDateTime
+    val validUntil: LocalDateTime,
+    val createdBy: Long,
+    val updatedBy: Long,
 )
 
 data class CreateTicketTierRequest(
@@ -31,7 +33,10 @@ data class CreateTicketTierRequest(
     var validFrom: LocalDateTime,
 
     @field:NotNull(message = "Valid Until date is required")
-    var validUntil: LocalDateTime
+    var validUntil: LocalDateTime,
+
+    @field:NotNull(message = "Valid createdBy is required")
+    var createdBy: Long,
 )
 
 data class UpdateTicketTierRequest(
@@ -45,7 +50,10 @@ data class UpdateTicketTierRequest(
     val totalAllocation: Int?,
 
     val validFrom: LocalDateTime?,
-    val validUntil: LocalDateTime?
+    val validUntil: LocalDateTime?,
+
+    @field:NotNull(message = "Valid updatedBy is required")
+    var updatedBy: Long,
 )
 
 data class EventDTO(

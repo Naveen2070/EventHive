@@ -12,7 +12,9 @@ data class TicketTier(
     val totalAllocation: Int,
     val availableAllocation: Int,
     val validFrom: LocalDateTime,
-    val validUntil: LocalDateTime
+    val validUntil: LocalDateTime,
+    val createdBy: Long,
+    val updatedBy: Long,
 )
 
 data class Event(

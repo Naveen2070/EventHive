@@ -12,6 +12,8 @@ import com.sam_the_dev.eventhive.infrastructure.persistence.booking.BookingEntit
 import com.sam_the_dev.eventhive.infrastructure.persistence.booking.BookingRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventEntity
 import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventRepository
+import com.sam_the_dev.eventhive.infrastructure.persistence.event.TicketTierEntity
+import com.sam_the_dev.eventhive.infrastructure.persistence.event.TicketTierRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserEntity
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserRepository
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -40,6 +42,9 @@ class BookingServiceImplUnitTest {
     lateinit var userRepository: UserRepository
 
     @Mock
+    lateinit var ticketTierRepository: TicketTierRepository
+
+    @Mock
     lateinit var eventPublisher: ApplicationEventPublisher
 
     @InjectMocks
@@ -55,15 +60,12 @@ class BookingServiceImplUnitTest {
         updatedBy = 0L,
     )
 
-    private fun createEvent(seats: Int = 10) = EventEntity(
+    private fun createEvent() = EventEntity(
         id = 100L,
         title = "Concert",
         startDate = LocalDateTime.now().plusDays(5),
         endDate = LocalDateTime.now().plusDays(6),
         location = "Stadium",
-        price = BigDecimal("50.00"),
-        totalSeats = seats,
-        availableSeats = seats, // Important
         status = EventStatus.PUBLISHED,
         organizer = createUser(),
         description = "des",
@@ -71,17 +73,34 @@ class BookingServiceImplUnitTest {
         updatedBy = 0L
     )
 
+    private fun createTier(event: EventEntity, seats: Int = 10) = TicketTierEntity(
+        id = 50L,
+        name = "General",
+        price = BigDecimal("50.00"),
+        totalAllocation = 100,
+        availableAllocation = seats,
+        validFrom = LocalDateTime.now(),
+        validUntil = LocalDateTime.now().plusDays(10),
+        event = event,
+        createdBy = 0L,
+        updatedBy = 0L
+    )
+
     // --- Create Booking Tests ---
 
     @Test
-    fun `createBooking should save booking, reduce seats, and publish event`() {
+    fun `createBooking should save booking, reduce tier inventory, and publish event`() {
         // 1. Setup
         val user = createUser()
-        val event = createEvent(seats = 10)
-        val request = CreateBookingRequest(eventId = 100L, ticketsCount = 2)
+        val event = createEvent()
+        val tier = createTier(event, seats = 10)
+
+        // Request now needs ticketTierId
+        val request = CreateBookingRequest(eventId = 100L, ticketTierId = 50L, ticketsCount = 2)
 
         whenever(userRepository.findByUsernameOrEmail(any(), any())).thenReturn(user)
         whenever(eventRepository.findById(100L)).thenReturn(Optional.of(event))
+        whenever(ticketTierRepository.findById(50L)).thenReturn(Optional.of(tier))
 
         // Mock Save: Return the entity passed to it
         whenever(bookingRepository.save(any<BookingEntity>())).thenAnswer {
@@ -97,23 +116,29 @@ class BookingServiceImplUnitTest {
         assertEquals(2, result.ticketsCount)
         assertEquals(BigDecimal("100.00"), result.totalPrice) // 2 * 50.00
 
-        // Inventory Check: 10 - 2 = 8
-        verify(eventRepository).save(check { savedEvent ->
-            assertEquals(8, savedEvent.availableSeats)
+        // Inventory Check on TIER: 10 - 2 = 8
+        verify(ticketTierRepository).save(check { savedTier ->
+            assertEquals(8, savedTier.availableAllocation)
         })
+
+        // Event should also be saved
+        verify(eventRepository).save(any<EventEntity>())
 
         // Event Publisher Check
         verify(eventPublisher).publishEvent(any<BookingSuccessEvent>())
     }
 
     @Test
-    fun `createBooking should throw InsufficientSeatsException`() {
+    fun `createBooking should throw InsufficientSeatsException when tier is full`() {
         val user = createUser()
-        val event = createEvent(seats = 2) // Only 2 left
-        val request = CreateBookingRequest(eventId = 100L, ticketsCount = 5) // Want 5
+        val event = createEvent()
+        val tier = createTier(event, seats = 2)
+
+        val request = CreateBookingRequest(eventId = 100L, ticketTierId = 50L, ticketsCount = 5)
 
         whenever(userRepository.findByUsernameOrEmail(any(), any())).thenReturn(user)
         whenever(eventRepository.findById(100L)).thenReturn(Optional.of(event))
+        whenever(ticketTierRepository.findById(50L)).thenReturn(Optional.of(tier))
 
         // Execute & Assert
         assertThrows(InsufficientSeatsException::class.java) {
@@ -122,20 +147,23 @@ class BookingServiceImplUnitTest {
 
         // Ensure we never saved anything
         verify(bookingRepository, never()).save(any())
-        verify(eventRepository, never()).save(any())
+        verify(ticketTierRepository, never()).save(any())
     }
 
     // --- Update Status Tests ---
 
     @Test
-    fun `updateBookingStatus should restore seats when cancelling`() {
+    fun `updateBookingStatus should restore tier seats when cancelling`() {
         // 1. Setup existing booking
         val user = createUser()
-        val event = createEvent(seats = 5) // Currently 5 left
+        val event = createEvent()
+        val tier = createTier(event, seats = 5)
+
         val booking = BookingEntity(
             id = 1L,
             user = user,
             event = event,
+            ticketTier = tier,
             bookingReference = "REF",
             ticketsCount = 2,
             totalPrice = BigDecimal("100"),
@@ -150,9 +178,9 @@ class BookingServiceImplUnitTest {
         // 2. Execute: User cancels their own booking
         bookingService.updateBookingStatus(1L, BookingStatus.CANCELLED, "fan@test.com", isAdmin = false)
 
-        // 3. Assert: Seats should increase (5 + 2 = 7)
-        verify(eventRepository).save(check { savedEvent ->
-            assertEquals(7, savedEvent.availableSeats)
+        // 3. Assert: Tier Seats should increase (5 + 2 = 7)
+        verify(ticketTierRepository).save(check { savedTier ->
+            assertEquals(7, savedTier.availableAllocation)
         })
 
         verify(bookingRepository).save(check { savedBooking ->
@@ -164,10 +192,13 @@ class BookingServiceImplUnitTest {
     fun `updateBookingStatus user cannot upgrade to CONFIRMED`() {
         val user = createUser()
         val event = createEvent()
+        val tier = createTier(event)
+
         val booking = BookingEntity(
             id = 1L,
             user = user,
             event = event,
+            ticketTier = tier,
             bookingReference = "REF",
             ticketsCount = 2,
             totalPrice = BigDecimal("100"),
@@ -190,10 +221,13 @@ class BookingServiceImplUnitTest {
     fun `processPaymentWebhook should confirm booking on SUCCESS`() {
         val user = createUser()
         val event = createEvent()
+        val tier = createTier(event)
+
         val booking = BookingEntity(
             id = 1L,
             user = user,
             event = event,
+            ticketTier = tier,
             bookingReference = "REF-123",
             ticketsCount = 1,
             totalPrice = BigDecimal("50"),
@@ -215,13 +249,16 @@ class BookingServiceImplUnitTest {
     }
 
     @Test
-    fun `processPaymentWebhook should cancel booking and restore seats on FAILED`() {
+    fun `processPaymentWebhook should cancel booking and restore tier seats on FAILED`() {
         val user = createUser()
-        val event = createEvent(seats = 0) // Sold out currently
+        val event = createEvent()
+        val tier = createTier(event, seats = 0) // Sold out currently
+
         val booking = BookingEntity(
             id = 1L,
             user = user,
             event = event,
+            ticketTier = tier,
             bookingReference = "REF-123",
             ticketsCount = 2,
             totalPrice = BigDecimal("100"),
@@ -242,9 +279,9 @@ class BookingServiceImplUnitTest {
             assertEquals(BookingStatus.CANCELLED, b.status)
         })
 
-        // 2. Seats Restored (0 + 2 = 2)
-        verify(eventRepository).save(check { e ->
-            assertEquals(2, e.availableSeats)
+        // 2. Tier Seats Restored (0 + 2 = 2)
+        verify(ticketTierRepository).save(check { t ->
+            assertEquals(2, t.availableAllocation)
         })
     }
 }

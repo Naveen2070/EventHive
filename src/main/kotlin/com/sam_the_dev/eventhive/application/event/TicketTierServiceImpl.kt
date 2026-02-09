@@ -1,7 +1,6 @@
 package com.sam_the_dev.eventhive.application.event
 
 import com.sam_the_dev.eventhive.api.dto.CreateTicketTierRequest
-import com.sam_the_dev.eventhive.api.dto.TicketTierDTO
 import com.sam_the_dev.eventhive.api.dto.UpdateTicketTierRequest
 import com.sam_the_dev.eventhive.domain.event.TicketTier
 import com.sam_the_dev.eventhive.domain.event.TicketTierService
@@ -24,7 +23,8 @@ class TicketTierServiceImpl(
         eventId: Long,
         request: CreateTicketTierRequest,
         userEmail: String,
-        isAdmin: Boolean
+        isAdmin: Boolean,
+
     ): TicketTier {
         val event = eventRepository.findById(eventId)
             .orElseThrow { EventNotFoundException("Event not found") }
@@ -46,10 +46,12 @@ class TicketTierServiceImpl(
             name = request.name,
             price = request.price,
             totalAllocation = request.totalAllocation,
-            availableAllocation = request.totalAllocation, // New tier = full availability
+            availableAllocation = request.totalAllocation,
             validFrom = request.validFrom,
             validUntil = request.validUntil,
-            event = event
+            event = event,
+            createdBy = request.createdBy,
+            updatedBy = request.createdBy,
         )
 
         val savedTier = ticketTierRepository.save(newTier)
@@ -106,6 +108,8 @@ class TicketTierServiceImpl(
             tier.validUntil = newEnd
         }
 
+        tier.updatedBy = request.updatedBy
+
         val savedTier = ticketTierRepository.save(tier)
         return savedTier.toDomain()
     }
@@ -136,22 +140,11 @@ class TicketTierServiceImpl(
         }
     }
 
-    // Helper to reuse DTO mapping logic locally if needed, or import from Mapper
-    private fun TicketTierEntity.toDTO() = TicketTierDTO(
-        id = id!!,
-        name = name,
-        price = price,
-        totalAllocation = totalAllocation,
-        availableAllocation = availableAllocation,
-        validFrom = validFrom,
-        validUntil = validUntil
-    )
 
     @Transactional(readOnly = true)
-    override fun getTierById(tierId: Long): TicketTierDTO {
+    override fun getTierById(tierId: Long): TicketTier {
         val tier = ticketTierRepository.findById(tierId)
             .orElseThrow { TicketTierNotFoundException("Ticket tier not found with ID: $tierId") }
-
-        return tier.toDTO()
+        return tier.toDomain()
     }
 }

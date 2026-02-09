@@ -33,7 +33,9 @@ fun Event.toDTO(): EventDTO {
                 it.totalAllocation,
                 it.availableAllocation,
                 it.validFrom,
-                it.validUntil
+                it.validUntil,
+                it.createdBy,
+                it.updatedBy
             )
         },
         priceRange = priceRangeString,
@@ -51,5 +53,7 @@ fun TicketTier.toDTO(): TicketTierDTO = TicketTierDTO(
     totalAllocation = totalAllocation,
     availableAllocation = availableAllocation,
     validFrom = validFrom,
-    validUntil = validUntil
+    validUntil = validUntil,
+    createdBy = createdBy,
+    updatedBy = updatedBy,
 )

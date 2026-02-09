@@ -59,7 +59,9 @@ class EventServiceImpl(
                 availableAllocation = tierReq.totalAllocation,
                 validFrom = tierReq.validFrom,
                 validUntil = tierReq.validUntil,
-                event = eventEntity
+                event = eventEntity,
+                createdBy = organizer.id ?: request.createdBy,
+                updatedBy = organizer.id ?: request.createdBy,
             )
         }
 
@@ -77,12 +79,12 @@ class EventServiceImpl(
     @Transactional(readOnly = true)
     override fun getAllEvents(pageable: Pageable, criteria: EventSearchCriteria): Page<EventDTO> {
         val specification = EventSpecification.withCriteria(criteria)
-        return eventRepository.findAll(specification,pageable)
+        return eventRepository.findAll(specification, pageable)
             .map { it.toDomain().toDTO() }
     }
 
     @Transactional(readOnly = true)
-    override fun getEventById(id: Long): EventDTO{
+    override fun getEventById(id: Long): EventDTO {
         val event = eventRepository.findById(id)
             .orElseThrow { EventNotFoundException("Event not found with ID: $id") }
 
@@ -99,7 +101,12 @@ class EventServiceImpl(
     }
 
     @Transactional
-    override fun updateEvent(eventId: Long, request: UpdateEventRequest, userEmail: String, isAdmin: Boolean): EventDTO {
+    override fun updateEvent(
+        eventId: Long,
+        request: UpdateEventRequest,
+        userEmail: String,
+        isAdmin: Boolean
+    ): EventDTO {
         val event = eventRepository.findById(eventId)
             .orElseThrow { EventNotFoundException("Event not found") }
 

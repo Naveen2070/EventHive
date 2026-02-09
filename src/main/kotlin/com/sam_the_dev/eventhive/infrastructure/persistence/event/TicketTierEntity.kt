@@ -35,5 +35,11 @@ class TicketTierEntity(
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "event_id", nullable = false)
-    val event: EventEntity
-): AuditableEntity()
+    val event: EventEntity,
+
+    @Column(name = "created_by", nullable = false)
+    val createdBy: Long,
+
+    @Column(name = "updated_by", nullable = false)
+    var updatedBy: Long,
+) : AuditableEntity()

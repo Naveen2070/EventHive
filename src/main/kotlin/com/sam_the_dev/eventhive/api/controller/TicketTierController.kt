@@ -123,7 +123,8 @@ class TicketTierController(
     )
     fun getTier(@PathVariable tierId: Long): ResponseEntity<TicketTierDTO> {
         val tier = ticketTierService.getTierById(tierId)
-        return ResponseEntity.ok(tier)
+        val tierDTO = tier.toDTO()
+        return ResponseEntity.ok(tierDTO)
     }
 
     private fun isAdmin(authentication: Authentication): Boolean {

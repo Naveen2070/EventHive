@@ -5,15 +5,16 @@ import com.sam_the_dev.eventhive.domain.event.TicketTier
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.toDomain
 
 fun TicketTierEntity.toDomain(): TicketTier = TicketTier(
-    id = id,
-    name = name,
-    price = price,
-    totalAllocation = totalAllocation,
-    availableAllocation = availableAllocation,
-    validFrom = validFrom,
-    validUntil = validUntil
+    id = this.id,
+    name = this.name,
+    price =this.price,
+    totalAllocation = this.totalAllocation,
+    availableAllocation = this.availableAllocation,
+    validFrom = this.validFrom,
+    validUntil = this.validUntil,
+    createdBy = this.createdBy,
+    updatedBy =this.updatedBy,
 )
-
 fun EventEntity.toDomain(): Event = Event(
     id = id ?: 0L,
     title = title,
