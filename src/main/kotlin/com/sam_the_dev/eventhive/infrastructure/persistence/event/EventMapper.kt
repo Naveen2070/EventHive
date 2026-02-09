@@ -1,8 +1,20 @@
 package com.sam_the_dev.eventhive.infrastructure.persistence.event
 
 import com.sam_the_dev.eventhive.domain.event.Event
+import com.sam_the_dev.eventhive.domain.event.TicketTier
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.toDomain
 
+fun TicketTierEntity.toDomain(): TicketTier = TicketTier(
+    id = this.id,
+    name = this.name,
+    price =this.price,
+    totalAllocation = this.totalAllocation,
+    availableAllocation = this.availableAllocation,
+    validFrom = this.validFrom,
+    validUntil = this.validUntil,
+    createdBy = this.createdBy,
+    updatedBy =this.updatedBy,
+)
 fun EventEntity.toDomain(): Event = Event(
     id = id ?: 0L,
     title = title,
@@ -10,9 +22,7 @@ fun EventEntity.toDomain(): Event = Event(
     startDate = startDate,
     endDate = endDate,
     location = location,
-    price = price,
-    totalSeats = totalSeats,
-    availableSeats = availableSeats,
+    ticketTiers = ticketTiers.map { it.toDomain() },
     status = status,
     organizerId = organizer.id ?: 0L,
     organizerName = organizer.username,

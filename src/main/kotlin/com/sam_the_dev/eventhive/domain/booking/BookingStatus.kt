@@ -4,5 +4,7 @@ enum class BookingStatus {
     PENDING_PAYMENT,
     CONFIRMED,
     CANCELLED,
-    REFUNDED
+    REFUNDED,
+    EXPIRED,
+    CHECKED_IN,
 }

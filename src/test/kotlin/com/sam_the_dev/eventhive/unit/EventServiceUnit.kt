@@ -1,16 +1,17 @@
 package com.sam_the_dev.eventhive.unit
 
 import com.sam_the_dev.eventhive.api.dto.CreateEventRequest
+import com.sam_the_dev.eventhive.api.dto.CreateTicketTierRequest
 import com.sam_the_dev.eventhive.api.dto.UpdateEventRequest
 import com.sam_the_dev.eventhive.application.event.EventServiceImpl
 import com.sam_the_dev.eventhive.domain.event.EventStatus
 import com.sam_the_dev.eventhive.domain.event.error.EventDateChangeNotAllowedException
 import com.sam_the_dev.eventhive.domain.event.error.EventModificationNotAllowedException
-import com.sam_the_dev.eventhive.domain.event.error.InsufficientSeatCapacityException
 import com.sam_the_dev.eventhive.domain.event.error.UnauthorizedEventAccessException
 import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
 import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventEntity
 import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventRepository
+import com.sam_the_dev.eventhive.infrastructure.persistence.event.TicketTierEntity
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserEntity
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserRepository
 import org.junit.jupiter.api.Assertions.*
@@ -21,6 +22,7 @@ import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.Mockito.*
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.argumentCaptor
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.*
@@ -38,7 +40,7 @@ class EventServiceUnitTest {
     lateinit var eventService: EventServiceImpl
 
     // ------------------------
-    // Fixtures
+    // Fixtures & Helpers
     // ------------------------
 
     private val organizer = UserEntity(
@@ -52,25 +54,44 @@ class EventServiceUnitTest {
 
     private val adminEmail = "admin@test.com"
 
-    private fun event(
-        total: Int = 50,
-        available: Int = 50,
-        status: EventStatus = EventStatus.DRAFT
-    ) = EventEntity(
-        id = 1L,
-        title = "Event",
-        description = "Desc",
-        startDate = LocalDateTime.now().plusDays(1),
-        endDate = LocalDateTime.now().plusDays(2),
-        location = "NYC",
-        price = BigDecimal.TEN,
-        totalSeats = total,
-        availableSeats = available,
-        status = status,
-        organizer = organizer,
-        createdBy = 1L,
-        updatedBy = 1L
-    )
+    // Helper to create an event with attached tiers
+    private fun createEventEntity(
+        status: EventStatus = EventStatus.DRAFT,
+        hasSoldTickets: Boolean = false
+    ): EventEntity {
+        val event = EventEntity(
+            id = 1L,
+            title = "Event",
+            description = "Desc",
+            startDate = LocalDateTime.now().plusDays(10),
+            endDate = LocalDateTime.now().plusDays(12),
+            location = "NYC",
+            status = status,
+            organizer = organizer,
+            createdBy = 1L,
+            updatedBy = 1L
+        )
+
+        // Create a tier
+        val total = 50
+        val available = if (hasSoldTickets) 40 else 50
+
+        val tier = TicketTierEntity(
+            id = 10L,
+            name = "General",
+            price = BigDecimal("100.00"),
+            totalAllocation = total,
+            availableAllocation = available,
+            validFrom = event.startDate,
+            validUntil = event.endDate,
+            event = event,
+            createdBy = 1L,
+            updatedBy = 1L
+        )
+
+        event.ticketTiers.add(tier)
+        return event
+    }
 
     // ------------------------
     // CREATE EVENT
@@ -78,21 +99,29 @@ class EventServiceUnitTest {
 
     @Test
     fun `should create event successfully`() {
+        // Setup DTO with Tiers
+        val tierRequest = CreateTicketTierRequest(
+            name = "VIP",
+            price = BigDecimal("100"),
+            totalAllocation = 50,
+            validFrom = LocalDateTime.now(),
+            validUntil = LocalDateTime.now().plusDays(1),
+            createdBy = 1L
+        )
+
         val request = CreateEventRequest(
             title = "New Event",
             description = "Desc",
             startDate = LocalDateTime.now().plusDays(1),
             endDate = LocalDateTime.now().plusDays(2),
             location = "NYC",
-            price = BigDecimal("100"),
-            totalSeats = 50,
+            ticketTiers = listOf(tierRequest),
             organizerEmail = "org@test.com",
             createdBy = 1L
         )
 
-        `when`(
-            userRepository.findByUsernameOrEmail("org@test.com", "org@test.com")
-        ).thenReturn(organizer)
+        `when`(userRepository.findByUsernameOrEmail("org@test.com", "org@test.com"))
+            .thenReturn(organizer)
 
         `when`(eventRepository.save(any(EventEntity::class.java)))
             .thenAnswer {
@@ -101,27 +130,42 @@ class EventServiceUnitTest {
                 e
             }
 
+        // Execute
         val result = eventService.createEvent(request)
 
+        // Assert
         assertNotNull(result.id)
         assertEquals("New Event", result.title)
-        assertEquals(50, result.availableSeats)
         assertEquals(EventStatus.DRAFT, result.status)
+
+        // Verify the tier was added to the entity
+        val captor = argumentCaptor<EventEntity>()
+        verify(eventRepository).save(captor.capture())
+
+        val savedEvent = captor.firstValue
+        assertEquals(1, savedEvent.ticketTiers.size)
+        assertEquals("VIP", savedEvent.ticketTiers[0].name)
     }
 
     @Test
     fun `should fail to create event if organizer not found`() {
-        `when`(
-            userRepository.findByUsernameOrEmail("missing@test.com", "missing@test.com")
-        ).thenReturn(null)
+        `when`(userRepository.findByUsernameOrEmail("missing@test.com", "missing@test.com"))
+            .thenReturn(null)
+
+        val tierRequest = CreateTicketTierRequest(
+            name = "VIP",
+            price = BigDecimal("10"),
+            totalAllocation = 10,
+            validFrom = LocalDateTime.now(),
+            validUntil = LocalDateTime.now(),
+            createdBy = 1L
+        )
 
         assertThrows<UserNotFoundException> {
             eventService.createEvent(
                 CreateEventRequest(
-                    "X", "X",
-                    LocalDateTime.now(), LocalDateTime.now(),
-                    "X", BigDecimal.TEN, 10,
-                    "missing@test.com", 1L
+                    "X", "X", LocalDateTime.now(), LocalDateTime.now(), "X",
+                    listOf(tierRequest), "missing@test.com", 1L
                 )
             )
         }
@@ -132,15 +176,15 @@ class EventServiceUnitTest {
     // ------------------------
 
     @Test
-    fun `organizer can update own event`() {
-        val event = event()
+    fun `organizer can update own event title and location`() {
+        val event = createEventEntity()
 
         `when`(eventRepository.findById(1L)).thenReturn(Optional.of(event))
         `when`(eventRepository.save(event)).thenReturn(event)
 
         val result = eventService.updateEvent(
             1L,
-            UpdateEventRequest("Updated", null, null, null, null, null, null),
+            UpdateEventRequest("Updated", null, null, null, null),
             "org@test.com",
             false
         )
@@ -150,13 +194,12 @@ class EventServiceUnitTest {
 
     @Test
     fun `non-owner cannot update event`() {
-        `when`(eventRepository.findById(1L))
-            .thenReturn(Optional.of(event()))
+        `when`(eventRepository.findById(1L)).thenReturn(Optional.of(createEventEntity()))
 
         assertThrows<UnauthorizedEventAccessException> {
             eventService.updateEvent(
                 1L,
-                UpdateEventRequest("Hack", null, null, null, null, null, null),
+                UpdateEventRequest("Hack", null, null, null, null),
                 "hacker@test.com",
                 false
             )
@@ -165,14 +208,14 @@ class EventServiceUnitTest {
 
     @Test
     fun `admin can update any event`() {
-        val event = event()
+        val event = createEventEntity()
 
         `when`(eventRepository.findById(1L)).thenReturn(Optional.of(event))
         `when`(eventRepository.save(event)).thenReturn(event)
 
         val result = eventService.updateEvent(
             1L,
-            UpdateEventRequest("Admin Edit", null, null, null, null, null, null),
+            UpdateEventRequest("Admin Edit", null, null, null, null),
             adminEmail,
             true
         )
@@ -182,32 +225,15 @@ class EventServiceUnitTest {
 
     @Test
     fun `cannot change dates if tickets sold`() {
-        val soldEvent = event(50, 40)
+        // Create event where available < total (means tickets sold)
+        val soldEvent = createEventEntity(hasSoldTickets = true)
 
-        `when`(eventRepository.findById(1L))
-            .thenReturn(Optional.of(soldEvent))
+        `when`(eventRepository.findById(1L)).thenReturn(Optional.of(soldEvent))
 
         assertThrows<EventDateChangeNotAllowedException> {
             eventService.updateEvent(
                 1L,
-                UpdateEventRequest(null, null, null, null, null, LocalDateTime.now(), null),
-                "org@test.com",
-                false
-            )
-        }
-    }
-
-    @Test
-    fun `cannot reduce seats below sold count`() {
-        val soldEvent = event(50, 45)
-
-        `when`(eventRepository.findById(1L))
-            .thenReturn(Optional.of(soldEvent))
-
-        assertThrows<InsufficientSeatCapacityException> {
-            eventService.updateEvent(
-                1L,
-                UpdateEventRequest(null, null, null, null, 3, null, null),
+                UpdateEventRequest(null, null, null, LocalDateTime.now(), null), // Try to change start date
                 "org@test.com",
                 false
             )
@@ -220,30 +246,36 @@ class EventServiceUnitTest {
 
     @Test
     fun `cannot revert to draft after tickets sold`() {
-        val soldEvent = event(50, 45, EventStatus.PUBLISHED)
+        val soldEvent = createEventEntity(status = EventStatus.PUBLISHED, hasSoldTickets = true)
 
-        `when`(eventRepository.findById(1L))
-            .thenReturn(Optional.of(soldEvent))
+        `when`(eventRepository.findById(1L)).thenReturn(Optional.of(soldEvent))
 
         assertThrows<EventModificationNotAllowedException> {
-            eventService.changeEventStatus(
-                1L, EventStatus.DRAFT, "org@test.com", false
-            )
+            eventService.changeEventStatus(1L, EventStatus.DRAFT, "org@test.com", false)
         }
     }
 
     @Test
     fun `cannot change status if completed`() {
-        val completed = event(status = EventStatus.COMPLETED)
+        val completed = createEventEntity(status = EventStatus.COMPLETED)
 
-        `when`(eventRepository.findById(1L))
-            .thenReturn(Optional.of(completed))
+        `when`(eventRepository.findById(1L)).thenReturn(Optional.of(completed))
 
         assertThrows<EventModificationNotAllowedException> {
-            eventService.changeEventStatus(
-                1L, EventStatus.CANCELLED, "org@test.com", false
-            )
+            eventService.changeEventStatus(1L, EventStatus.CANCELLED, "org@test.com", false)
         }
+    }
+
+    @Test
+    fun `should change status successfully`() {
+        val event = createEventEntity(status = EventStatus.DRAFT)
+
+        `when`(eventRepository.findById(1L)).thenReturn(Optional.of(event))
+        `when`(eventRepository.save(event)).thenReturn(event)
+
+        val result = eventService.changeEventStatus(1L, EventStatus.PUBLISHED, "org@test.com", false)
+
+        assertEquals(EventStatus.PUBLISHED, result.status)
     }
 
     // ------------------------
@@ -252,14 +284,10 @@ class EventServiceUnitTest {
 
     @Test
     fun `organizer can delete unlocked event`() {
-        val event = event()
+        val event = createEventEntity(status = EventStatus.DRAFT)
 
-        `when`(eventRepository.findById(1L))
-            .thenReturn(Optional.of(event))
-
-        `when`(
-            userRepository.findByUsernameOrEmail("org@test.com", "org@test.com")
-        ).thenReturn(organizer)
+        `when`(eventRepository.findById(1L)).thenReturn(Optional.of(event))
+        `when`(userRepository.findByUsernameOrEmail("org@test.com", "org@test.com")).thenReturn(organizer)
 
         eventService.deleteEvent(1L, "org@test.com", false)
 
@@ -269,17 +297,29 @@ class EventServiceUnitTest {
 
     @Test
     fun `cannot delete published event with sold tickets`() {
-        val event = event(50, 40, EventStatus.PUBLISHED)
+        val event = createEventEntity(status = EventStatus.PUBLISHED, hasSoldTickets = true)
 
-        `when`(eventRepository.findById(1L))
-            .thenReturn(Optional.of(event))
+        `when`(eventRepository.findById(1L)).thenReturn(Optional.of(event))
+        `when`(userRepository.findByUsernameOrEmail("org@test.com", "org@test.com")).thenReturn(organizer)
 
-        `when`(
-            userRepository.findByUsernameOrEmail("org@test.com", "org@test.com")
-        ).thenReturn(organizer)
-
-        assertThrows<EventModificationNotAllowedException> {
+        val ex = assertThrows<EventModificationNotAllowedException> {
             eventService.deleteEvent(1L, "org@test.com", false)
         }
+        assertTrue(ex.message!!.contains("tickets are sold"))
+    }
+
+    @Test
+    fun `cannot delete published event that has started`() {
+        val event = createEventEntity(status = EventStatus.PUBLISHED, hasSoldTickets = false)
+        // Set start date to past
+        event.startDate = LocalDateTime.now().minusHours(1)
+
+        `when`(eventRepository.findById(1L)).thenReturn(Optional.of(event))
+        `when`(userRepository.findByUsernameOrEmail("org@test.com", "org@test.com")).thenReturn(organizer)
+
+        val ex = assertThrows<EventModificationNotAllowedException> {
+            eventService.deleteEvent(1L, "org@test.com", false)
+        }
+        assertTrue(ex.message!!.contains("event has started"))
     }
 }

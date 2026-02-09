@@ -1,5 +1,6 @@
 package com.sam_the_dev.eventhive.api.dto
 
+import com.sam_the_dev.eventhive.api.utils.sanitizeForHtml
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 
@@ -15,4 +16,9 @@ data class LoginRequest(
 data class AuthResponse(
     val token: String,
     val identifier: String
+)
+
+fun AuthResponse.sanitizedForHtml(): AuthResponse = AuthResponse(
+    token = token,
+    identifier = sanitizeForHtml(identifier)
 )

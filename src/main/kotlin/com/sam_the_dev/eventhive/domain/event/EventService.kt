@@ -8,7 +8,7 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 
 interface EventService {
-    fun createEvent(request: CreateEventRequest): EventDTO
+    fun createEvent(request: CreateEventRequest): Event
     fun getAllEvents(pageable: Pageable, criteria: EventSearchCriteria): Page<EventDTO>
     fun getEventById(id: Long): EventDTO
     fun getMyEvents(organizerEmail: String, pageable: Pageable): Page<EventDTO>

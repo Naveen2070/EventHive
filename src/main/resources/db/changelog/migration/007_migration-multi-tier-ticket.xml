@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 1. Create ticket_tiers table -->
+    <changeSet id="007-01-create-ticket-tiers-table" author="naveen" labels="multi-tier-ticket,ticket-tier-initial,initial-migration">
+        <comment>Multi-tier ticket migration to support tiered pricing and ticket allocation</comment>
+        <createTable tableName="ticket_tiers">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="event_id" type="BIGINT">
+                <constraints nullable="false" foreignKeyName="fk_tiers_events" references="events(id)"/>
+            </column>
+            <column name="name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="price" type="DECIMAL(10,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="total_allocation" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="available_allocation" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="valid_from" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="valid_until" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_by" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="deleted_by" type="BIGINT"/>
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_deleted" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP" defaultValueDate="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" type="TIMESTAMP" defaultValueDate="CURRENT_TIMESTAMP"/>
+            <column name="deleted_at" type="TIMESTAMP"/>
+            <column name="version" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Unique constraint to prevent duplicate tier names per event -->
+        <addUniqueConstraint tableName="ticket_tiers" columnNames="event_id,name" constraintName="uc_event_ticket_name"/>
+
+        <!-- Index for faster lookup by event -->
+        <createIndex tableName="ticket_tiers" indexName="idx_ticket_tiers_event_id">
+            <column name="event_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- 2. Migrate existing events to ticket tiers -->
+    <changeSet id="007-02-migrate-existing-events-to-tiers" author="naveen" labels="multi-tier-ticket-migration,event-to-tier-migration">
+        <sql>
+            INSERT INTO ticket_tiers (event_id, name, price, total_allocation, available_allocation, valid_from, valid_until)
+            SELECT id, 'General Admission', price, total_seats, available_seats, start_date, end_date
+            FROM events;
+        </sql>
+    </changeSet>
+
+    <!-- 3. Add ticket_tier_id to bookings -->
+    <changeSet id="007-03-add-tier-fk-to-bookings" author="naveen" labels="multi-tier-ticket-migration,booking-to-tier-migration">
+        <addColumn tableName="bookings">
+            <column name="ticket_tier_id" type="BIGINT">
+                <constraints foreignKeyName="fk_bookings_tiers" references="ticket_tiers(id)"/>
+            </column>
+        </addColumn>
+
+        <!-- Index for faster join -->
+        <createIndex tableName="bookings" indexName="idx_bookings_ticket_tier_id">
+            <column name="ticket_tier_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- 4. Link existing bookings to ticket tiers (Postgres-friendly) -->
+    <changeSet id="007-04-link-bookings-to-tiers" author="naveen" labels="multi-tier-ticket-migration,booking-to-tier-migration">
+        <sql>
+            UPDATE bookings b
+            SET ticket_tier_id = t.id
+                FROM ticket_tiers t
+            WHERE t.event_id = b.event_id
+              AND t.name = 'General Admission';
+        </sql>
+    </changeSet>
+
+    <!-- 5. Enforce NOT NULL for ticket_tier_id -->
+    <changeSet id="007-05-enforce-tier-fk-not-null" author="naveen" labels="multi-tier-ticket-migration,booking-to-tier-migration,ticket-tier-constraint">
+        <addNotNullConstraint tableName="bookings" columnName="ticket_tier_id" columnDataType="BIGINT"/>
+    </changeSet>
+
+    <!-- 6. Add check-in columns -->
+    <changeSet id="007-06-add-checkin-columns" author="naveen" labels="multi-tier-ticket-migration,booking-to-tier-migration,check-in-columns">
+        <addColumn tableName="bookings">
+            <column name="last_checked_in_at" type="TIMESTAMP"/>
+            <column name="check_in_count" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- 7. Drop legacy columns from events -->
+    <changeSet id="007-07-drop-legacy-event-columns" author="naveen" labels="multi-tier-ticket-migration,booking-to-tier-migration,drop-legacy-columns">
+        <dropColumn tableName="events" columnName="price"/>
+        <dropColumn tableName="events" columnName="total_seats"/>
+        <dropColumn tableName="events" columnName="available_seats"/>
+    </changeSet>
+
+</databaseChangeLog>

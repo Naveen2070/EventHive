@@ -13,37 +13,87 @@ class EmailService(
 ) {
     private val logger = LoggerFactory.getLogger(EmailService::class.java)
 
-    @Value("\${spring.mail.username}")
+    @Value("\${spring.mail.username:no-reply@eventhive.com}")
     private lateinit var senderEmail: String
 
+    @Value("\${frontend.url:http://localhost:3001/}")
+    private lateinit var frontendUrl: String
+
     fun sendBookingConfirmation(to: String, booking: BookingDTO) {
+        val subject = "Booking Confirmed: ${booking.eventTitle} 🎟️"
+
+        val content = """
+        Hello!
+        
+        Your booking for "${booking.eventTitle}" is confirmed 🎉
+        
+        --------------------------------------
+        Booking Reference: ${booking.bookingReference}
+        Tickets: ${booking.ticketsCount}
+        Total Price: $${booking.totalPrice}
+        Status: ${booking.status}
+        --------------------------------------
+        
+        Please show this reference ID at the entrance.
+        
+        Thank you for using EventHive!
+        — The EventHive Team
+    """.trimIndent()
+
+        sendEmail(to, subject, content)
+    }
+
+
+    fun sendPasswordResetLink(to: String, token: String, username: String) {
+        val resetLink = "$frontendUrl/reset-password?token=$token"
+
+        val subject = "Reset Your Password - EventHive 🔐"
+        val text = """
+            Hi $username,
+            
+            We received a request to reset your password for your EventHive account.
+            
+            Click the link below to set a new password:
+            $resetLink
+            
+            This link will expire in 24 hours.
+            
+            If you didn't request this, you can safely ignore this email.
+            
+            - The EventHive Team
+        """.trimIndent()
+
+        sendEmail(to, subject, text)
+    }
+
+    fun sendPasswordChangedAlert(to: String, username: String) {
+        val subject = "Security Alert: Password Changed 🛡️"
+        val text = """
+            Hi $username,
+            
+            Your password was successfully changed just now.
+            
+            If this was you, great! You can ignore this email.
+            
+            🚨 If you did NOT make this change, please contact support immediately to secure your account.
+            
+            - The EventHive Team
+        """.trimIndent()
+
+        sendEmail(to, subject, text)
+    }
+
+    // DRY (Don't Repeat Yourself) Helper
+    private fun sendEmail(to: String, subject: String, content: String) {
         try {
             val message = SimpleMailMessage()
-            message.from = "no-reply@eventhive.com"
+            message.from = senderEmail
             message.setTo(to)
-            message.subject = "Booking Confirmed: ${booking.eventTitle} 🎟️"
-            message.text = """
-                Hello!
-                
-                Your booking for "${booking.eventTitle}" is confirmed!
-                
-                --------------------------------------
-                Booking Reference: ${booking.bookingReference}
-                Tickets: ${booking.ticketsCount}
-                Total Price: $${booking.totalPrice}
-                Status: ${booking.status}
-                --------------------------------------
-                
-                Please show this reference ID at the entrance.
-                
-                Thank you for using EventHive!
-            """.trimIndent()
-
+            message.subject = subject
+            message.text = content
             mailSender.send(message)
-            logger.info("Confirmation email sent to $to for booking ${booking.bookingReference}")
-
+            logger.info("Email sent to $to | Subject: $subject")
         } catch (e: Exception) {
-            // Note: In production, you might want to retry this or log it to an alert system
             logger.error("Failed to send email to $to", e)
         }
     }

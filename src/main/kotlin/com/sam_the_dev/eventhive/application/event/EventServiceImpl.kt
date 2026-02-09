@@ -5,14 +5,15 @@ import com.sam_the_dev.eventhive.api.dto.EventDTO
 import com.sam_the_dev.eventhive.api.dto.EventSearchCriteria
 import com.sam_the_dev.eventhive.api.dto.UpdateEventRequest
 import com.sam_the_dev.eventhive.api.mapper.toDTO
+import com.sam_the_dev.eventhive.domain.event.Event
 import com.sam_the_dev.eventhive.domain.event.EventService
 import com.sam_the_dev.eventhive.domain.event.EventStatus
-import com.sam_the_dev.eventhive.domain.event.error.*
+import com.sam_the_dev.eventhive.domain.event.error.EventDateChangeNotAllowedException
+import com.sam_the_dev.eventhive.domain.event.error.EventModificationNotAllowedException
+import com.sam_the_dev.eventhive.domain.event.error.EventNotFoundException
+import com.sam_the_dev.eventhive.domain.event.error.UnauthorizedEventAccessException
 import com.sam_the_dev.eventhive.domain.user.error.UserNotFoundException
-import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventEntity
-import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventRepository
-import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventSpecification
-import com.sam_the_dev.eventhive.infrastructure.persistence.event.toDomain
+import com.sam_the_dev.eventhive.infrastructure.persistence.event.*
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.toDomain
 import org.slf4j.LoggerFactory
@@ -31,7 +32,7 @@ class EventServiceImpl(
     private val logger = LoggerFactory.getLogger(EventServiceImpl::class.java)
 
     @Transactional
-    override fun createEvent(request: CreateEventRequest): EventDTO {
+    override fun createEvent(request: CreateEventRequest): Event {
         val organizerEmail = request.organizerEmail
 
         val organizer = userRepository.findByUsernameOrEmail(organizerEmail, organizerEmail)
@@ -44,18 +45,31 @@ class EventServiceImpl(
             startDate = request.startDate,
             endDate = request.endDate,
             location = request.location,
-            price = request.price,
-            totalSeats = request.totalSeats,
-            availableSeats = request.totalSeats,
             status = EventStatus.DRAFT,
             organizer = organizer,
-            createdBy = request.createdBy,
-            updatedBy = request.createdBy,
+            createdBy = organizer.id ?: request.createdBy,
+            updatedBy = organizer.id ?: request.createdBy,
         )
+
+        val tiers = request.ticketTiers.map { tierReq ->
+            TicketTierEntity(
+                name = tierReq.name,
+                price = tierReq.price,
+                totalAllocation = tierReq.totalAllocation,
+                availableAllocation = tierReq.totalAllocation,
+                validFrom = tierReq.validFrom,
+                validUntil = tierReq.validUntil,
+                event = eventEntity,
+                createdBy = organizer.id ?: request.createdBy,
+                updatedBy = organizer.id ?: request.createdBy,
+            )
+        }
+
+        eventEntity.ticketTiers.addAll(tiers)
 
         try {
             val savedEvent = eventRepository.save(eventEntity)
-            return savedEvent.toDomain().toDTO()
+            return savedEvent.toDomain()
         } catch (e: Exception) {
             logger.error("Failed to create event: ${e.message}")
             throw RuntimeException("Failed to create event: ${e.message}")
@@ -65,12 +79,12 @@ class EventServiceImpl(
     @Transactional(readOnly = true)
     override fun getAllEvents(pageable: Pageable, criteria: EventSearchCriteria): Page<EventDTO> {
         val specification = EventSpecification.withCriteria(criteria)
-        return eventRepository.findAll(specification,pageable)
+        return eventRepository.findAll(specification, pageable)
             .map { it.toDomain().toDTO() }
     }
 
     @Transactional(readOnly = true)
-    override fun getEventById(id: Long): EventDTO{
+    override fun getEventById(id: Long): EventDTO {
         val event = eventRepository.findById(id)
             .orElseThrow { EventNotFoundException("Event not found with ID: $id") }
 
@@ -87,15 +101,20 @@ class EventServiceImpl(
     }
 
     @Transactional
-    override fun updateEvent(eventId: Long, request: UpdateEventRequest, userEmail: String, isAdmin: Boolean): EventDTO {
+    override fun updateEvent(
+        eventId: Long,
+        request: UpdateEventRequest,
+        userEmail: String,
+        isAdmin: Boolean
+    ): EventDTO {
         val event = eventRepository.findById(eventId)
             .orElseThrow { EventNotFoundException("Event not found") }
 
         // 1. Security Check: Ownership
         validateOwnership(event, userEmail, isAdmin)
 
-        // 2. 🛡️ Business Rule: Cannot change dates if tickets are sold
-        val hasSoldTickets = event.totalSeats != event.availableSeats
+        // 2. Business Rule: Cannot change dates if tickets are sold
+        val hasSoldTickets = event.ticketTiers.any { it.totalAllocation != it.availableAllocation }
 
         if (hasSoldTickets) {
             if (request.startDate != null || request.endDate != null) {
@@ -108,23 +127,10 @@ class EventServiceImpl(
         request.title?.let { event.title = it }
         request.description?.let { event.description = it }
         request.location?.let { event.location = it }
-        request.price?.let { event.price = it }
 
         // Apply Dates (Only if no tickets sold, or if they passed the check above)
         request.startDate?.let { event.startDate = it }
         request.endDate?.let { event.endDate = it }
-
-        request.totalSeats?.let { newTotal ->
-            if (hasSoldTickets && newTotal < (event.totalSeats - event.availableSeats)) {
-                // Prevent reducing total seats below the number of currently sold tickets
-                throw InsufficientSeatCapacityException("Cannot reduce total seats below the number of already sold tickets.")
-            }
-            // Adjust available seats logic:
-            // logic: diff = newTotal - oldTotal. available += diff
-            val diff = newTotal - event.totalSeats
-            event.totalSeats = newTotal
-            event.availableSeats += diff
-        }
 
         try {
             val savedEvent = eventRepository.save(event)
@@ -135,6 +141,7 @@ class EventServiceImpl(
         }
     }
 
+    @Transactional
     override fun changeEventStatus(
         eventId: Long,
         status: EventStatus,
@@ -146,7 +153,7 @@ class EventServiceImpl(
 
         validateOwnership(event, userEmail, isAdmin)
 
-        val hasSoldTickets = event.totalSeats != event.availableSeats
+        val hasSoldTickets = event.ticketTiers.any { it.totalAllocation != it.availableAllocation }
         // Rule 1: If tickets are sold, you CANNOT go back to DRAFT.
         // But you CAN go to CANCELLED or COMPLETED.
         if (hasSoldTickets && status == EventStatus.DRAFT) {
@@ -170,6 +177,7 @@ class EventServiceImpl(
         }
     }
 
+    @Transactional
     override fun deleteEvent(eventId: Long, userEmail: String, isAdmin: Boolean) {
         val user = userRepository.findByUsernameOrEmail(userEmail, userEmail)
             ?: throw UserNotFoundException(userEmail, "User not found")
@@ -199,7 +207,7 @@ class EventServiceImpl(
     }
 
     private fun assertEventNotLocked(event: EventEntity) {
-        val hasSoldTickets = event.totalSeats != event.availableSeats
+        val hasSoldTickets = event.ticketTiers.any { it.totalAllocation != it.availableAllocation }
         val hasStarted = event.startDate.atZone(ZoneId.systemDefault()).toInstant().isBefore(Instant.now())
         val isPublished = event.status == EventStatus.PUBLISHED
 

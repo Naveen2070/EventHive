@@ -2,9 +2,9 @@ package com.sam_the_dev.eventhive.unit
 
 import com.sam_the_dev.eventhive.api.dto.LoginRequest
 import com.sam_the_dev.eventhive.api.dto.RegisterUserDTO
-import com.sam_the_dev.eventhive.api.dto.UserDTO
 import com.sam_the_dev.eventhive.application.auth.AuthServiceImpl
 import com.sam_the_dev.eventhive.domain.auth.error.InvalidCredentialsException
+import com.sam_the_dev.eventhive.domain.user.User
 import com.sam_the_dev.eventhive.domain.user.UserService
 import com.sam_the_dev.eventhive.infrastructure.security.JwtService
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
@@ -22,10 +23,10 @@ import org.mockito.kotlin.verifyNoInteractions
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
-import org.springframework.security.core.userdetails.User
+import org.springframework.security.core.Authentication
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.security.core.userdetails.UserDetailsService
-import java.time.Instant
+import org.springframework.security.core.userdetails.User as SecurityUser
 
 @ExtendWith(MockitoExtension::class)
 class AuthServiceUnitTest {
@@ -53,18 +54,13 @@ class AuthServiceUnitTest {
             password = "password",
         )
 
-        val expectedUser = UserDTO(
+        val expectedUser = User(
             id = 1L,
             username = "sam",
             email = "sam@test.com",
-            roles = setOf("USER"),
+            password = "encoded_password",
             createdBy = 0L,
-            updatedBy = 0L,
-            createdAt = Instant.now(),
-            updatedAt = Instant.now(),
-            deletedAt = null,
-            isActive = true,
-            isDeleted = false,
+            updatedBy = 0L
         )
 
         `when`(userService.registerUser(registerRequest)).thenReturn(expectedUser)
@@ -79,27 +75,48 @@ class AuthServiceUnitTest {
     fun `login should return token on successful authentication`() {
         val loginRequest = LoginRequest("sam@test.com", "password")
 
-        val userDetails: UserDetails = User.builder()
+        // 1. Setup Spring Security UserDetails (for UserDetailsService)
+        val userDetails: UserDetails = SecurityUser.builder()
             .username("sam@test.com")
             .password("encoded_password")
             .roles("USER")
             .build()
 
+        // 2. Setup Domain User (for UserService - REQUIRED for custom claims)
+        val domainUser = User(
+            id = 100L,
+            username = "sam",
+            email = "sam@test.com",
+            password = "encoded_password",
+            createdBy = 0L,
+            updatedBy = 0L
+        )
+
         val generatedToken = "jwt_token_123"
 
+        // Mock 1: Authentication Manager
         `when`(authenticationManager.authenticate(any<UsernamePasswordAuthenticationToken>()))
-            .thenReturn(null) // just indicate success
+            .thenReturn(mock(Authentication::class.java))
 
+        // Mock 2: UserDetailsService
         `when`(userDetailsService.loadUserByUsername("sam@test.com")).thenReturn(userDetails)
+
+        // Mock 3: UserService
+        `when`(userService.getUserByEmailOrUsername("sam@test.com")).thenReturn(domainUser)
+
+        // Mock 4: JwtService
         `when`(jwtService.generateToken(any(), eq(userDetails))).thenReturn(generatedToken)
 
+        // Act
         val response = authService.login(loginRequest)
 
+        // Assert
         assertEquals(generatedToken, response.token)
         assertEquals("sam@test.com", response.identifier)
 
         verify(authenticationManager).authenticate(any<UsernamePasswordAuthenticationToken>())
         verify(userDetailsService).loadUserByUsername("sam@test.com")
+        verify(userService).getUserByEmailOrUsername("sam@test.com")
         verify(jwtService).generateToken(any(), eq(userDetails))
     }
 
@@ -117,5 +134,6 @@ class AuthServiceUnitTest {
         assertEquals("Invalid email or password", exception.message)
 
         verifyNoInteractions(jwtService)
+        verifyNoInteractions(userService)
     }
 }

@@ -19,6 +19,12 @@
     <!-- Bookings table -->
     <include file="db/changelog/migration/005_create_bookings_table.xml"/>
 
+    <!--Ticket Tire Table-->
+    <include file="db/changelog/migration/007_migration-multi-tier-ticket.xml"/>
+
+    <!-- Password Reset Token Table -->
+    <include file="db/changelog/migration/008_password_reset_token.xml"/>
+
     <!-- Field Changes -->
     <include file="db/changelog/migration/006_add_version_columns.xml"/>
 

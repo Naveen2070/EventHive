@@ -1,9 +1,7 @@
 package com.sam_the_dev.eventhive.api.controller
 
-import com.sam_the_dev.eventhive.api.dto.AuthResponse
-import com.sam_the_dev.eventhive.api.dto.LoginRequest
-import com.sam_the_dev.eventhive.api.dto.RegisterUserDTO
-import com.sam_the_dev.eventhive.api.dto.UserDTO
+import com.sam_the_dev.eventhive.api.dto.*
+import com.sam_the_dev.eventhive.api.mapper.toDTO
 import com.sam_the_dev.eventhive.domain.auth.AuthService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -59,7 +57,8 @@ class AuthController(
         userDto: RegisterUserDTO
     ): ResponseEntity<UserDTO> {
         val createdUser = authService.registerUser(userDto)
-        return ResponseEntity(createdUser, HttpStatus.CREATED)
+        val userDTO = createdUser.toDTO()
+        return ResponseEntity(userDTO, HttpStatus.CREATED)
     }
 
     @Operation(
@@ -91,6 +90,7 @@ class AuthController(
         loginDto: LoginRequest
     ): ResponseEntity<AuthResponse> {
         val res = authService.login(loginDto)
-        return ResponseEntity(res, HttpStatus.OK)
+        val sanitizedRes = res.sanitizedForHtml()
+        return ResponseEntity(sanitizedRes, HttpStatus.OK)
     }
 }

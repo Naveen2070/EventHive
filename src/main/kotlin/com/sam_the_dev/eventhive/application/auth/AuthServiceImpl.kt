@@ -3,9 +3,9 @@ package com.sam_the_dev.eventhive.application.auth
 import com.sam_the_dev.eventhive.api.dto.AuthResponse
 import com.sam_the_dev.eventhive.api.dto.LoginRequest
 import com.sam_the_dev.eventhive.api.dto.RegisterUserDTO
-import com.sam_the_dev.eventhive.api.dto.UserDTO
-import com.sam_the_dev.eventhive.domain.auth.error.InvalidCredentialsException
 import com.sam_the_dev.eventhive.domain.auth.AuthService
+import com.sam_the_dev.eventhive.domain.auth.error.InvalidCredentialsException
+import com.sam_the_dev.eventhive.domain.user.User
 import com.sam_the_dev.eventhive.domain.user.UserService
 import com.sam_the_dev.eventhive.infrastructure.security.JwtService
 import org.slf4j.LoggerFactory
@@ -27,7 +27,7 @@ class AuthServiceImpl(
     private val logger = LoggerFactory.getLogger(AuthServiceImpl::class.java)
 
     @Transactional
-    override fun registerUser(user: RegisterUserDTO): UserDTO {
+    override fun registerUser(user: RegisterUserDTO): User {
        return userService.registerUser(user)
     }
 
@@ -43,9 +43,14 @@ class AuthServiceImpl(
 
             // 2. Load user details
             val userDetails = userDetailsService.loadUserByUsername(loginRequest.identifier)
+            val user = userService.getUserByEmailOrUsername(loginRequest.identifier)
 
             // 3. (Optional) Add custom JWT claims here
-            val customClaims = mapOf<String, Any>()
+            val customClaims = mapOf<String, Any>(
+                "id" to user.id!!,
+                "email" to user.email,
+                "username" to user.username
+            )
 
             // 4. Generate JWT
             val token = jwtService.generateToken(customClaims, userDetails)

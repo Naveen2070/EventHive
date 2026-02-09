@@ -11,6 +11,8 @@ import com.sam_the_dev.eventhive.domain.event.EventStatus
 import com.sam_the_dev.eventhive.infrastructure.persistence.booking.BookingRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventEntity
 import com.sam_the_dev.eventhive.infrastructure.persistence.event.EventRepository
+import com.sam_the_dev.eventhive.infrastructure.persistence.event.TicketTierEntity
+import com.sam_the_dev.eventhive.infrastructure.persistence.event.TicketTierRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.role.RoleEntity
 import com.sam_the_dev.eventhive.infrastructure.persistence.role.RoleRepository
 import com.sam_the_dev.eventhive.infrastructure.persistence.role.UserRoleEntity
@@ -54,6 +56,9 @@ class BookingControllerIntegrationTest {
     lateinit var eventRepository: EventRepository
 
     @Autowired
+    lateinit var ticketTierRepository: TicketTierRepository
+
+    @Autowired
     lateinit var userRepository: UserRepository
 
     @Autowired
@@ -66,51 +71,68 @@ class BookingControllerIntegrationTest {
     private lateinit var userToken: String
     private lateinit var adminToken: String
     private var eventId: Long = 0
+    private var ticketTierId: Long = 0
 
     @BeforeEach
     fun setup() {
         // 1. Clean DB
         bookingRepository.deleteAll()
+        ticketTierRepository.deleteAll()
         eventRepository.deleteAll()
         userRepository.deleteAll()
 
         // 2. Roles
-        val roleAdmin = roleRepository.findByName("ADMIN")!!
-        val roleUser = roleRepository.findByName("USER")!!
-        val roleOrg = roleRepository.findByName("ORGANIZER")!!
+        val roleAdmin = roleRepository.findByName("ADMIN")
+            ?: roleRepository.save(RoleEntity(name = "ADMIN", createdBy = 0, updatedBy = 0))
+        val roleUser = roleRepository.findByName("USER")
+            ?: roleRepository.save(RoleEntity(name = "USER", createdBy = 0, updatedBy = 0))
+        val roleOrg = roleRepository.findByName("ORGANIZER")
+            ?: roleRepository.save(RoleEntity(name = "ORGANIZER", createdBy = 0, updatedBy = 0))
 
         // 3. Create Organizer & Event
         val organizer = userRepository.save(
             UserEntity(
                 username = "org",
                 email = "org@test.com",
-                password = "x",
+                password = passwordEncoder.encode("x"),
                 createdBy = 0L,
                 updatedBy = 0L
             )
         )
-        organizer.userRoles.add(
-            UserRoleEntity(
-                user = organizer,
-                role = roleOrg,
-                createdBy = 0L,
-                updatedBy = 0L
-            )
-        )
-        userRepository.save(organizer)
+        // Add role to organizer
+        userRepository.save(organizer.apply {
+            this.userRoles.add(UserRoleEntity(user = this, role = roleOrg, createdBy = 0, updatedBy = 0))
+        })
 
-        val event = eventRepository.save(
-            EventEntity(
-                title = "Rock Concert", description = "Live",
-                startDate = LocalDateTime.now().plusDays(5), endDate = LocalDateTime.now().plusDays(6),
-                location = "Stadium", price = BigDecimal("50.00"),
-                totalSeats = 10, availableSeats = 10, status = EventStatus.PUBLISHED,
-                organizer = organizer,
-                createdBy = 0L,
-                updatedBy = 0L
-            )
+        // Create Event
+        var event = EventEntity(
+            title = "Rock Concert",
+            description = "Live",
+            startDate = LocalDateTime.now().plusDays(5),
+            endDate = LocalDateTime.now().plusDays(6),
+            location = "Stadium",
+            organizer = organizer,
+            createdBy = organizer.id!!,
+            updatedBy = organizer.id!!,
+            status = EventStatus.PUBLISHED // Must be PUBLISHED to book
         )
+        event = eventRepository.save(event)
         eventId = event.id!!
+
+        // Create Ticket Tier
+        var ticketTier = TicketTierEntity(
+            name = "General",
+            price = BigDecimal(100),
+            totalAllocation = 10,
+            availableAllocation = 10,
+            validFrom = LocalDateTime.now(),
+            validUntil = LocalDateTime.now().plusDays(10),
+            event = event,
+            createdBy = organizer.id!!,
+            updatedBy = organizer.id!!
+        )
+        ticketTier = ticketTierRepository.save(ticketTier)
+        ticketTierId = ticketTier.id!!
 
         // 4. Create Users & Tokens
         userToken = registerAndLogin("fan", "fan@test.com", "pass@123", roleUser)
@@ -118,14 +140,14 @@ class BookingControllerIntegrationTest {
     }
 
     private fun registerAndLogin(username: String, email: String, pass: String, role: RoleEntity): String {
-        val user = UserEntity(
+        var user = UserEntity(
             username = username,
             email = email,
             password = passwordEncoder.encode(pass),
             createdBy = 0L,
             updatedBy = 0L
         )
-        userRepository.save(user)
+        user = userRepository.save(user)
         user.userRoles.add(
             UserRoleEntity(
                 user = user,
@@ -146,7 +168,8 @@ class BookingControllerIntegrationTest {
 
     @Test
     fun `should create a booking successfully and decrease seats`() {
-        val request = CreateBookingRequest(eventId = eventId, ticketsCount = 2)
+        // Need to provide ticketTierId now
+        val request = CreateBookingRequest(eventId = eventId, ticketTierId = ticketTierId, ticketsCount = 2)
 
         mockMvc.post("/api/bookings") {
             header("Authorization", "Bearer $userToken")
@@ -154,19 +177,21 @@ class BookingControllerIntegrationTest {
             content = objectMapper.writeValueAsString(request)
         }.andExpect {
             status { isCreated() }
-            jsonPath("$.status") { value("PENDING_PAYMENT") } // or CONFIRMED depending on your default
+            jsonPath("$.status") { value("PENDING_PAYMENT") }
             jsonPath("$.ticketsCount") { value(2) }
-        }
+        }.andReturn()
 
         // Verify Inventory in DB
-        val updatedEvent = eventRepository.findById(eventId).get()
-        assertEquals(8, updatedEvent.availableSeats, "Should have 8 seats left (10 - 2)")
+        // NOTE: We need to check the TICKET TIER inventory, NOT the Event inventory directly if your logic is tier-based.
+        // Assuming your updated logic (from ServiceImpl) decreases ticketTier.availableAllocation
+        val updatedTier = ticketTierRepository.findById(ticketTierId).get()
+        assertEquals(8, updatedTier.availableAllocation, "Should have 8 seats left (10 - 2)")
     }
 
     @Test
     fun `should list my bookings`() {
         // 1. Create a booking first
-        val request = CreateBookingRequest(eventId = eventId, ticketsCount = 1)
+        val request = CreateBookingRequest(eventId = eventId, ticketTierId = ticketTierId, ticketsCount = 1)
         mockMvc.post("/api/bookings") {
             header("Authorization", "Bearer $userToken")
             contentType = MediaType.APPLICATION_JSON
@@ -186,10 +211,11 @@ class BookingControllerIntegrationTest {
     @Test
     fun `user should be able to CANCEL their own booking`() {
         // 1. Create Booking (Seats = 8)
+        val createReq = CreateBookingRequest(eventId = eventId, ticketTierId = ticketTierId, ticketsCount = 2)
         val createRes = mockMvc.post("/api/bookings") {
             header("Authorization", "Bearer $userToken")
             contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(CreateBookingRequest(eventId, 2))
+            content = objectMapper.writeValueAsString(createReq)
         }.andReturn()
 
         val bookingId = objectMapper.readTree(createRes.response.contentAsString).get("bookingId").asLong()
@@ -207,8 +233,8 @@ class BookingControllerIntegrationTest {
         }
 
         // 3. Verify Seats Restored (Seats = 10)
-        val event = eventRepository.findById(eventId).get()
-        assertEquals(10, event.availableSeats, "Seats should be restored after cancellation")
+        val tier = ticketTierRepository.findById(ticketTierId).get()
+        assertEquals(10, tier.availableAllocation, "Seats should be restored after cancellation")
     }
 
     @Test
@@ -217,7 +243,7 @@ class BookingControllerIntegrationTest {
         val createRes = mockMvc.post("/api/bookings") {
             header("Authorization", "Bearer $userToken")
             contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(CreateBookingRequest(eventId, 1))
+            content = objectMapper.writeValueAsString(CreateBookingRequest(eventId, ticketTierId, 1))
         }.andReturn()
         val bookingId = objectMapper.readTree(createRes.response.contentAsString).get("bookingId").asLong()
 
@@ -229,8 +255,7 @@ class BookingControllerIntegrationTest {
             contentType = MediaType.APPLICATION_JSON
             content = objectMapper.writeValueAsString(updateRequest)
         }.andExpect {
-            status { isForbidden() } // Or 500/400 depending on your exception handler
-            // Ideally your service throws "Users can only CANCEL..."
+            status { isForbidden() } // Your Service throws ResourceAccessDeniedException which maps to 403 Forbidden
         }
     }
 
@@ -240,7 +265,7 @@ class BookingControllerIntegrationTest {
         val createRes = mockMvc.post("/api/bookings") {
             header("Authorization", "Bearer $userToken")
             contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(CreateBookingRequest(eventId, 1))
+            content = objectMapper.writeValueAsString(CreateBookingRequest(eventId, ticketTierId, 1))
         }.andReturn()
         val bookingId = objectMapper.readTree(createRes.response.contentAsString).get("bookingId").asLong()
 
@@ -263,7 +288,7 @@ class BookingControllerIntegrationTest {
         val createRes = mockMvc.post("/api/bookings") {
             header("Authorization", "Bearer $userToken")
             contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(CreateBookingRequest(eventId, 1))
+            content = objectMapper.writeValueAsString(CreateBookingRequest(eventId, ticketTierId, 1))
         }.andReturn()
 
         val ref = objectMapper.readTree(createRes.response.contentAsString).get("bookingReference").asText()
@@ -284,6 +309,7 @@ class BookingControllerIntegrationTest {
         }
 
         // 3. Verify Booking is now CONFIRMED
+        // Need to fetch fresh from DB
         val booking = bookingRepository.findById(id).get()
         assertEquals(BookingStatus.CONFIRMED, booking.status)
     }

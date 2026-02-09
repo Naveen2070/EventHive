@@ -1,6 +1,7 @@
 package com.sam_the_dev.eventhive.api.controller
 
 import com.sam_the_dev.eventhive.api.dto.*
+import com.sam_the_dev.eventhive.api.mapper.toDTO
 import com.sam_the_dev.eventhive.domain.booking.BookingService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -8,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
+import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
@@ -56,7 +58,8 @@ class BookingController(
     ): ResponseEntity<BookingDTO> {
         val userEmail = authentication.name
         val response = bookingService.createBooking(request, userEmail)
-        return ResponseEntity(response, HttpStatus.CREATED)
+        val responseDTO = response.toDTO()
+        return ResponseEntity(responseDTO, HttpStatus.CREATED)
     }
 
     @Operation(
@@ -155,5 +158,52 @@ class BookingController(
     ): ResponseEntity<String> {
         bookingService.processPaymentWebhook(payload)
         return ResponseEntity.ok("payment status processed successfully")
+    }
+
+
+    @PostMapping("/check-in")
+    @PreAuthorize("hasRole('ORGANIZER')")
+    @Operation(
+        summary = "Check in an attendee",
+        description = "Validates a booking reference and marks the ticket as checked in. Only event organizers can perform this action.",
+        security = [SecurityRequirement(name = "bearerAuth")]
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "Check-in successful",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = CheckInResponse::class)
+                    )
+                ]
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "Invalid or already-used ticket",
+                content = [Content(schema = Schema())]
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "Unauthorized – organizer does not own the event",
+                content = [Content(schema = Schema())]
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "Booking not found",
+                content = [Content(schema = Schema())]
+            )
+        ]
+    )
+    fun checkInAttendee(
+        @RequestBody request: CheckInRequest,
+        authentication: Authentication
+    ): ResponseEntity<CheckInResponse> {
+        val res = bookingService.checkInAttendee(request, authentication.name)
+        return ResponseEntity.ok(
+            res.toSanitized()
+        )
     }
 }

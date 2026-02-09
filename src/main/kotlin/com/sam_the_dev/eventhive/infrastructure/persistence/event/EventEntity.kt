@@ -4,7 +4,6 @@ import com.sam_the_dev.eventhive.domain.event.EventStatus
 import com.sam_the_dev.eventhive.infrastructure.persistence.base.AuditableEntity
 import com.sam_the_dev.eventhive.infrastructure.persistence.user.UserEntity
 import jakarta.persistence.*
-import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @Entity
@@ -29,14 +28,8 @@ class EventEntity(
     @Column(nullable = false)
     var location: String,
 
-    @Column(nullable = false)
-    var price: BigDecimal,
-
-    @Column(name = "total_seats", nullable = false)
-    var totalSeats: Int,
-
-    @Column(name = "available_seats", nullable = false)
-    var availableSeats: Int,
+    @OneToMany(mappedBy = "event", cascade = [CascadeType.ALL], orphanRemoval = true)
+    var ticketTiers: MutableList<TicketTierEntity> = mutableListOf(),
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

@@ -1,6 +1,7 @@
 package com.sam_the_dev.eventhive.api.controller
 
 import com.sam_the_dev.eventhive.api.dto.*
+import com.sam_the_dev.eventhive.api.mapper.toDTO
 import com.sam_the_dev.eventhive.domain.event.EventService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -56,7 +57,8 @@ class EventController(
         request: CreateEventRequest,
     ): ResponseEntity<EventDTO> {
         val response = eventService.createEvent(request)
-        return ResponseEntity(response, HttpStatus.CREATED)
+        val responseDTO = response.toDTO()
+        return ResponseEntity(responseDTO, HttpStatus.CREATED)
     }
 
     @Operation(

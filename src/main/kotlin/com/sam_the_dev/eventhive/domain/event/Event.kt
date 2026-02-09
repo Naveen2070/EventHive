@@ -5,6 +5,18 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDateTime
 
+data class TicketTier(
+    val id: Long?,
+    val name: String,
+    val price: BigDecimal,
+    val totalAllocation: Int,
+    val availableAllocation: Int,
+    val validFrom: LocalDateTime,
+    val validUntil: LocalDateTime,
+    val createdBy: Long,
+    val updatedBy: Long,
+)
+
 data class Event(
     val id: Long?,
     val title: String,
@@ -12,9 +24,7 @@ data class Event(
     val startDate: LocalDateTime,
     val endDate: LocalDateTime,
     val location: String,
-    val price: BigDecimal,
-    val totalSeats: Int,
-    val availableSeats: Int,
+    val ticketTiers: List<TicketTier>,
     val status: EventStatus,
     val organizerId: Long,
     val organizerName: String,
