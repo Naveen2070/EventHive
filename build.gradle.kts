@@ -7,7 +7,7 @@ plugins {
     kotlin("plugin.jpa") version "1.9.25"
 }
 
-group = "com.sam_the_dev"
+group = "com.thehiveproject"
 version = "0.0.1-SNAPSHOT"
 description = "EventHive - Event Management System"
 

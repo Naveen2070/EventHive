@@ -1,1 +1,1 @@
-rootProject.name = "EventHive"
+rootProject.name = "event"
