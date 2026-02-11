@@ -1,16 +1,4 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="EventHive" type="JUnit" factoryName="JUnit">
-    <module name="EventHive.test" />
-    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
-    <option name="ALTERNATIVE_JRE_PATH" value="21" />
-    <option name="PACKAGE_NAME" value="com.sam_the_dev.eventhive" />
-    <option name="MAIN_CLASS_NAME" value="" />
-    <option name="METHOD_NAME" value="" />
-    <option name="TEST_OBJECT" value="package" />
-    <method v="2">
-      <option name="Make" enabled="true" />
-    </method>
-  </configuration>
   <configuration default="false" name="EventHive" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
     <option name="ACTIVE_PROFILES" value="dev" />
     <additionalParameters>
@@ -22,8 +10,8 @@
     </additionalParameters>
     <option name="ALTERNATIVE_JRE_PATH" value="21" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
-    <module name="EventHive.main" />
-    <option name="SPRING_BOOT_MAIN_CLASS" value="com.sam_the_dev.eventhive.EventHiveApplication" />
+    <module name="event.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.thehiveproject.event.EventHiveApplication" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>
@@ -35,5 +23,15 @@
       </settings>
     </deployment>
     <method v="2" />
+  </configuration>
+  <configuration default="false" name="EventHive" type="JUnit" factoryName="JUnit">
+    <module name="event.test" />
+    <option name="PACKAGE_NAME" value="com.thehiveproject.event" />
+    <option name="MAIN_CLASS_NAME" value="" />
+    <option name="METHOD_NAME" value="" />
+    <option name="TEST_OBJECT" value="package" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
   </configuration>
 </component>
