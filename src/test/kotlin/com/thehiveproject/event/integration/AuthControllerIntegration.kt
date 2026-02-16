@@ -3,7 +3,6 @@ package com.thehiveproject.event.integration
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.thehiveproject.event.TestcontainersConfiguration
 import com.thehiveproject.event.api.dto.LoginRequest
-import com.thehiveproject.event.api.dto.RegisterUserDTO
 import com.thehiveproject.event.infrastructure.persistence.user.UserRepository
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test

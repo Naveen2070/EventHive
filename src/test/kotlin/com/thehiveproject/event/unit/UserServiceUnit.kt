@@ -1,7 +1,6 @@
 package com.thehiveproject.event.unit
 
 import com.thehiveproject.event.api.dto.ChangePasswordRequest
-import com.thehiveproject.event.api.dto.RegisterUserDTO
 import com.thehiveproject.event.api.dto.UpdateUserRequest
 import com.thehiveproject.event.application.user.UserServiceImpl
 import com.thehiveproject.event.domain.user.error.*

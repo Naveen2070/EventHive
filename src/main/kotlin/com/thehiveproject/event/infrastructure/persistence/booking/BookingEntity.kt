@@ -4,7 +4,6 @@ import com.thehiveproject.event.domain.booking.BookingStatus
 import com.thehiveproject.event.infrastructure.persistence.base.AuditableEntity
 import com.thehiveproject.event.infrastructure.persistence.event.EventEntity
 import com.thehiveproject.event.infrastructure.persistence.event.TicketTierEntity
-import com.thehiveproject.event.infrastructure.persistence.user.UserEntity
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.Instant
@@ -19,9 +18,8 @@ class BookingEntity(
     @Column(name = "booking_reference", nullable = false, unique = true)
     var bookingReference: String,
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    var user: UserEntity,
+    @Column(name = "user_id", nullable = false)
+    var userId: Long,
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "event_id", nullable = false)

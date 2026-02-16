@@ -2,7 +2,6 @@ package com.thehiveproject.event.infrastructure.persistence.event
 
 import com.thehiveproject.event.domain.event.EventStatus
 import com.thehiveproject.event.infrastructure.persistence.base.AuditableEntity
-import com.thehiveproject.event.infrastructure.persistence.user.UserEntity
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -35,9 +34,8 @@ class EventEntity(
     @Column(nullable = false)
     var status: EventStatus,
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "organizer_id", nullable = false)
-    var organizer: UserEntity,
+    @Column(name = "organizer_id", nullable = false)
+    var organizerId: Long,
 
     @Column(name = "created_by" , nullable = false)
     val createdBy: Long,

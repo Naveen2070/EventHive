@@ -2,6 +2,7 @@ package com.thehiveproject.event.api.controller
 
 import com.thehiveproject.event.api.dto.*
 import com.thehiveproject.event.api.mapper.toDTO
+import com.thehiveproject.event.api.utils.extractToken
 import com.thehiveproject.event.domain.booking.BookingService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -14,10 +15,10 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
-import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 
 @RestController
@@ -54,10 +55,10 @@ class BookingController(
         @RequestBody
         @Parameter(description = "Booking creation request", required = true)
         request: CreateBookingRequest,
-        authentication: Authentication
+        @RequestHeader(HttpHeaders .AUTHORIZATION) authHeader: String
     ): ResponseEntity<BookingDTO> {
-        val userEmail = authentication.name
-        val response = bookingService.createBooking(request, userEmail)
+        val token = extractToken(authHeader)
+        val response = bookingService.createBooking(request, token)
         val responseDTO = response.toDTO()
         return ResponseEntity(responseDTO, HttpStatus.CREATED)
     }
@@ -79,13 +80,13 @@ class BookingController(
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     fun getMyBookings(
-        authentication: Authentication,
+        @RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String,
         @Parameter(description = "Pagination information")
         @PageableDefault(size = 10, sort = ["createdAt"])
         pageable: Pageable
     ): ResponseEntity<PaginatedResponse<BookingDTO>> {
-        val userEmail = authentication.name
-        val bookings = bookingService.getMyBookings(userEmail, pageable)
+        val token = extractToken(authHeader)
+        val bookings = bookingService.getMyBookings(token, pageable)
         return ResponseEntity.ok(bookings.toPaginatedResponse())
     }
 
@@ -119,17 +120,15 @@ class BookingController(
         @RequestBody
         @Parameter(description = "Booking status update request", required = true)
         request: UpdateBookingStatusRequest,
-        authentication: Authentication
+        @RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String
     ): ResponseEntity<BookingDTO> {
-        val isAdmin = authentication.authorities.any {
-            it.authority == "ROLE_ADMIN" || it.authority == "ROLE_SUPER_ADMIN"
-        }
+        val token = extractToken(authHeader)
+
 
         val response = bookingService.updateBookingStatus(
             id,
             request.status,
-            authentication.name,
-            isAdmin
+            token,
         )
 
         return ResponseEntity.ok(response)
@@ -199,9 +198,10 @@ class BookingController(
     )
     fun checkInAttendee(
         @RequestBody request: CheckInRequest,
-        authentication: Authentication
+        @RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String
     ): ResponseEntity<CheckInResponse> {
-        val res = bookingService.checkInAttendee(request, authentication.name)
+        val token = extractToken(authHeader)
+        val res = bookingService.checkInAttendee(request, token)
         return ResponseEntity.ok(
             res.toSanitized()
         )

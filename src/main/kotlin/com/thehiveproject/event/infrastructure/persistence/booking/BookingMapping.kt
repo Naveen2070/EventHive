@@ -3,14 +3,13 @@ package com.thehiveproject.event.infrastructure.persistence.booking
 import com.thehiveproject.event.domain.booking.Booking
 import com.thehiveproject.event.infrastructure.persistence.event.EventEntity
 import com.thehiveproject.event.infrastructure.persistence.event.TicketTierEntity
-import com.thehiveproject.event.infrastructure.persistence.user.UserEntity
 import java.time.ZoneId
 
 fun BookingEntity.toDomain(): Booking =
     Booking(
         id = id,
         bookingReference = bookingReference,
-        userId = user.id!!,
+        userId = userId,
         eventId = event.id!!,
         ticketTierId = ticketTier.id!!,
         ticketTierName = ticketTier.name,
@@ -31,14 +30,13 @@ fun BookingEntity.toDomain(): Booking =
     )
 
 fun Booking.toEntity(
-    user: UserEntity,
     event: EventEntity,
     tier: TicketTierEntity
 ): BookingEntity =
     BookingEntity(
         id = id,
         bookingReference = bookingReference,
-        user = user,
+        userId= userId,
         event = event,
         ticketTier = tier,
         ticketsCount = ticketsCount,

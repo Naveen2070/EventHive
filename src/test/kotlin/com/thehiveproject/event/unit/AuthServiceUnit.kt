@@ -1,7 +1,6 @@
 package com.thehiveproject.event.unit
 
 import com.thehiveproject.event.api.dto.LoginRequest
-import com.thehiveproject.event.api.dto.RegisterUserDTO
 import com.thehiveproject.event.application.auth.AuthServiceImpl
 import com.thehiveproject.event.domain.auth.error.InvalidCredentialsException
 import com.thehiveproject.event.domain.user.User

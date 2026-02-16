@@ -12,15 +12,13 @@ import com.thehiveproject.event.domain.booking.error.ResourceAccessDeniedExcepti
 import com.thehiveproject.event.domain.booking.event.BookingSuccessEvent
 import com.thehiveproject.event.domain.event.EventStatus
 import com.thehiveproject.event.domain.event.error.*
-import com.thehiveproject.event.domain.user.error.UserNotFoundException
 import com.thehiveproject.event.infrastructure.persistence.booking.BookingRepository
 import com.thehiveproject.event.infrastructure.persistence.booking.toDomain
 import com.thehiveproject.event.infrastructure.persistence.booking.toEntity
 import com.thehiveproject.event.infrastructure.persistence.event.EventRepository
 import com.thehiveproject.event.infrastructure.persistence.event.TicketTierRepository
 import com.thehiveproject.event.infrastructure.persistence.event.toDomain
-import com.thehiveproject.event.infrastructure.persistence.user.UserRepository
-import com.thehiveproject.event.infrastructure.persistence.user.toDomain
+import com.thehiveproject.event.infrastructure.security.JwtService
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.dao.OptimisticLockingFailureException
@@ -39,9 +37,9 @@ import java.time.ZoneOffset
 class BookingServiceImpl(
     private val bookingRepository: BookingRepository,
     private val eventRepository: EventRepository,
-    private val userRepository: UserRepository,
     private val ticketTierRepository: TicketTierRepository,
-    private val eventPublisher: ApplicationEventPublisher
+    private val eventPublisher: ApplicationEventPublisher,
+    private val jwtService: JwtService
 ) : BookingService {
 
     private val logger = LoggerFactory.getLogger(BookingServiceImpl::class.java)
@@ -52,12 +50,13 @@ class BookingServiceImpl(
         maxAttempts = 3,
         backoff = Backoff(delay = 50)
     )
-    override fun createBooking(request: CreateBookingRequest, userEmail: String): Booking {
+    override fun createBooking(request: CreateBookingRequest, token: String): Booking {
         logger.info("Attempting to book tickets for event ID: ${request.eventId}")
 
+
         // 1. Fetch User
-        val userEntity = userRepository.findByUsernameOrEmail(userEmail, userEmail)
-            ?: throw UserNotFoundException(userEmail, "User not found")
+        val userId = jwtService.extractUserId(token)
+        val userEmail = jwtService.extractUsername(token)
 
         // 2. Fetch Event (Fresh copy on every retry attempt)
         val eventEntity = eventRepository.findById(request.eventId)
@@ -87,11 +86,11 @@ class BookingServiceImpl(
 
         // 6. Create Domain Object (Using your Domain Logic)
         val bookingDomain = Booking.create(
-            user = userEntity.toDomain(),
+            userId,
             event = eventEntity.toDomain(),
             tier = tierEntity,
             ticketsCount = request.ticketsCount,
-            createdBy = userEntity.id!!
+            createdBy = userId
         )
 
         // 7. Update Inventory (Decrement Seats)
@@ -110,7 +109,7 @@ class BookingServiceImpl(
 
         try {
             // Convert Domain -> Entity and Save Booking
-            val bookingEntity = bookingDomain.toEntity(userEntity, eventEntity, tierEntity)
+            val bookingEntity = bookingDomain.toEntity(eventEntity, tierEntity)
             val savedBooking = bookingRepository.save(bookingEntity)
 
 
@@ -134,13 +133,12 @@ class BookingServiceImpl(
     }
 
     @Transactional(readOnly = true)
-    override fun getMyBookings(userEmail: String, pageable: Pageable): Page<BookingDTO> {
+    override fun getMyBookings(token: String, pageable: Pageable): Page<BookingDTO> {
         // 1. Get the User ID from the email
-        val user = userRepository.findByUsernameOrEmail(userEmail, userEmail)
-            ?: throw UserNotFoundException(userEmail, "User not found")
+        val userId = jwtService.extractUserId(token)
 
         // 2. Fetch Bookings from Repository
-        val bookingsPage = bookingRepository.findByUserId(user.id!!, pageable)
+        val bookingsPage = bookingRepository.findByUserId(userId, pageable)
 
         // 3. Map Entity -> DTO
         return bookingsPage.map { booking ->
@@ -152,16 +150,16 @@ class BookingServiceImpl(
     override fun updateBookingStatus(
         bookingId: Long,
         newStatus: BookingStatus,
-        userEmail: String,
-        isAdmin: Boolean
+        token: String
     ): BookingDTO {
         val booking = bookingRepository.findById(bookingId)
             .orElseThrow { BookingNotFoundException("Booking not found") }
+        val isAdmin = jwtService.hasAnyRole(token, "ROLE_ADMIN", "ROLE_SUPER_ADMIN")
 
         // 1. Security Check
         if (!isAdmin) {
             // Regular users can ONLY Cancel their own bookings
-            if (booking.user.email != userEmail && booking.user.username != userEmail) {
+            if (booking.userId != jwtService.extractUserId(token)) {
                 throw ResourceAccessDeniedException("You can only modify your own bookings.")
             }
             if (newStatus != BookingStatus.CANCELLED) {
@@ -229,13 +227,16 @@ class BookingServiceImpl(
     }
 
     @Transactional
-    override fun checkInAttendee(request: CheckInRequest, userEmail: String): CheckInResponse {
+    override fun checkInAttendee(request: CheckInRequest, token: String): CheckInResponse {
         val booking = bookingRepository.findByBookingReference(request.bookingReference)
             ?: throw BookingNotFoundException("Invalid Ticket Reference")
 
+        val userId = jwtService.extractUserId(token)
+        val userEmail = jwtService.extractUsername(token)
+
         // 1. Ownership Check (Organizer Only)
         // We check if the logged-in user (userEmail) owns the event
-        if (booking.event.organizer.email != userEmail) {
+        if (booking.userId != userId) {
             throw UnauthorizedEventAccessException("Access Denied: You are not the organizer.")
         }
 
@@ -248,7 +249,7 @@ class BookingServiceImpl(
                 success = false,
                 status = CheckInStatus.INVALID_STATUS,
                 message = "Ticket status is ${booking.status}",
-                attendeeName = booking.user.username,
+                attendeeName = userEmail,
                 ticketTierName = tier.name
             )
         }
@@ -259,7 +260,7 @@ class BookingServiceImpl(
                 success = false,
                 status = CheckInStatus.WRONG_DATE,
                 message = "Ticket not valid yet — too early",
-                attendeeName = booking.user.username,
+                attendeeName = userEmail,
                 ticketTierName = tier.name
             )
         }
@@ -270,7 +271,7 @@ class BookingServiceImpl(
                 success = false,
                 status = CheckInStatus.EXPIRED,
                 message = "Ticket Expired",
-                attendeeName = booking.user.username,
+                attendeeName = userEmail,
                 ticketTierName = tier.name
             )
         }
@@ -287,9 +288,9 @@ class BookingServiceImpl(
         if (isReEntry) {
             return CheckInResponse(
                 success = true,
-                status = CheckInStatus.ALREADY_CHECKED_IN, // 👈 Frontend uses this to show Yellow Alert
+                status = CheckInStatus.ALREADY_CHECKED_IN,
                 message = "Already checked in today",
-                attendeeName = booking.user.username,
+                attendeeName = userEmail,
                 ticketTierName = tier.name,
                 timestamp = LocalDateTime.ofInstant(booking.lastCheckedInAt, ZoneId.systemDefault())
             )
@@ -310,7 +311,7 @@ class BookingServiceImpl(
             success = true,
             status = CheckInStatus.CHECKED_IN,
             message = "Check-in Successful",
-            attendeeName = booking.user.username,
+            attendeeName = userEmail,
             ticketTierName = tier.name
         )
     }

@@ -67,7 +67,6 @@ data class EventDTO(
     val priceRange: String,
     val status: EventStatus,
     val organizerId: Long,
-    val organizerName: String,
     val createdAt: Instant
 )
 

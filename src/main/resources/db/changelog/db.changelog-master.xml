@@ -28,4 +28,7 @@
     <!-- Field Changes -->
     <include file="db/changelog/migration/006_add_version_columns.xml"/>
 
+    <!-- Cleanup -->
+    <include file="db/changelog/migration/009-cleanup-core-auth.xml"/>
+
 </databaseChangeLog>

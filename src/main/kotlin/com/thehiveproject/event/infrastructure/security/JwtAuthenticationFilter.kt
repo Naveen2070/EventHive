@@ -7,8 +7,8 @@ import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.LoggerFactory
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
-import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
@@ -16,7 +16,6 @@ import org.springframework.web.filter.OncePerRequestFilter
 @Component
 class JwtAuthenticationFilter(
     private val jwtService: JwtService,
-    private val userDetailsService: UserDetailsService
 ) : OncePerRequestFilter() {
 
     private val objectMapper = ObjectMapper()
@@ -38,20 +37,22 @@ class JwtAuthenticationFilter(
         val token = authHeader.substring(7)
 
         try {
-            val username = jwtService.extractUsername(token)
+            if (SecurityContextHolder.getContext().authentication == null && jwtService.isTokenValid(token)) {
+                // 1. Extract User Details from Token Claims
+                val username = jwtService.extractUsername(token)
+                val roles = jwtService.extractRoles(token)
 
-            if (SecurityContextHolder.getContext().authentication == null) {
-                val userDetails = userDetailsService.loadUserByUsername(username)
+                // 2. Convert Roles to Spring Security Authorities
+                val authorities = roles.map { SimpleGrantedAuthority(it) }
 
-                if (jwtService.isTokenValid(token, userDetails)) {
+                // 3. Create Authentication Object
                     val authToken = UsernamePasswordAuthenticationToken(
-                        userDetails,
+                        username,
                         null,
-                        userDetails.authorities
+                        authorities
                     )
                     authToken.details = WebAuthenticationDetailsSource().buildDetails(request)
                     SecurityContextHolder.getContext().authentication = authToken
-                }
             }
 
         } catch (ex: ExpiredJwtException) {

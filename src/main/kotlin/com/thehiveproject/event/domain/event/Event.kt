@@ -1,6 +1,5 @@
 package com.thehiveproject.event.domain.event
 
-import com.thehiveproject.event.domain.user.User
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDateTime
@@ -27,8 +26,6 @@ data class Event(
     val ticketTiers: List<TicketTier>,
     val status: EventStatus,
     val organizerId: Long,
-    val organizerName: String,
-    val organizer: User,
     val createdBy: Long,
     val updatedBy: Long,
     val deletedBy: Long?,

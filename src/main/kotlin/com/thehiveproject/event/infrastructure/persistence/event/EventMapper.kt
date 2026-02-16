@@ -2,7 +2,6 @@ package com.thehiveproject.event.infrastructure.persistence.event
 
 import com.thehiveproject.event.domain.event.Event
 import com.thehiveproject.event.domain.event.TicketTier
-import com.thehiveproject.event.infrastructure.persistence.user.toDomain
 
 fun TicketTierEntity.toDomain(): TicketTier = TicketTier(
     id = this.id,
@@ -24,9 +23,7 @@ fun EventEntity.toDomain(): Event = Event(
     location = location,
     ticketTiers = ticketTiers.map { it.toDomain() },
     status = status,
-    organizerId = organizer.id ?: 0L,
-    organizerName = organizer.username,
-    organizer = organizer.toDomain(),
+    organizerId = organizerId,
     createdBy = createdBy,
     updatedBy = updatedBy,
     deletedBy = deletedBy,

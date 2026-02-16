@@ -1,7 +1,6 @@
 package com.thehiveproject.event.domain.booking
 
 import com.thehiveproject.event.domain.event.Event
-import com.thehiveproject.event.domain.user.User
 import com.thehiveproject.event.infrastructure.persistence.event.TicketTierEntity // Or a Domain equivalent if you have one
 import java.math.BigDecimal
 import java.time.Instant
@@ -32,7 +31,7 @@ class Booking(
 ){
     companion object {
         fun create(
-            user: User,
+            userId: Long,
             event: Event,
             tier: TicketTierEntity,
             ticketsCount: Int,
@@ -43,7 +42,7 @@ class Booking(
                 bookingReference = UUID.randomUUID().toString(),
 
                 // user id is the id of the user who created the booking
-                userId = user.id!!,
+                userId = userId,
 
                 // event id is the id of the event
                 eventId = event.id!!,

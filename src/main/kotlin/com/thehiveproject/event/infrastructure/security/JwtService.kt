@@ -11,9 +11,9 @@ import java.util.*
 import javax.crypto.SecretKey
 
 @Service
-class JwtService (
-    private val jwtProperties: JwtProperties
-){
+class JwtService(
+    jwtProperties: JwtProperties
+) {
 
     private var secretKey: String = jwtProperties.secret
 
@@ -43,9 +43,8 @@ class JwtService (
     }
 
     // 2. Validate Token
-    fun isTokenValid(token: String, userDetails: UserDetails): Boolean {
-        val username = extractUsername(token)
-        return username == userDetails.username && !isTokenExpired(token)
+    fun isTokenValid(token: String): Boolean {
+        return !isTokenExpired(token)
     }
 
     // 3. Extract Username (Email)
@@ -61,6 +60,30 @@ class JwtService (
         val claims = extractAllClaims(token)
         return claimsResolver(claims)
     }
+
+    fun extractUserId(token: String): Long {
+        val claims = extractAllClaims(token)
+        return claims["id"].toString().toLong()
+    }
+
+    fun extractRoles(token: String): List<String> {
+        val claims = extractAllClaims(token)
+
+        return claims
+            .get("roles", List::class.java)
+            ?.map { it.toString() }
+            ?: emptyList()
+    }
+
+    fun hasAnyRole(token: String, vararg requiredRoles: String): Boolean {
+        val roles = extractAllClaims(token)
+            .get("roles", List::class.java)
+            ?.map { it.toString() }
+            ?: return false
+
+        return roles.any { it in requiredRoles }
+    }
+
 
     private fun extractAllClaims(token: String): Claims {
         return Jwts.parser()

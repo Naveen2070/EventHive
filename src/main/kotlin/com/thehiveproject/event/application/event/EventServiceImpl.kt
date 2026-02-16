@@ -12,10 +12,8 @@ import com.thehiveproject.event.domain.event.error.EventDateChangeNotAllowedExce
 import com.thehiveproject.event.domain.event.error.EventModificationNotAllowedException
 import com.thehiveproject.event.domain.event.error.EventNotFoundException
 import com.thehiveproject.event.domain.event.error.UnauthorizedEventAccessException
-import com.thehiveproject.event.domain.user.error.UserNotFoundException
 import com.thehiveproject.event.infrastructure.persistence.event.*
-import com.thehiveproject.event.infrastructure.persistence.user.UserRepository
-import com.thehiveproject.event.infrastructure.persistence.user.toDomain
+import com.thehiveproject.event.infrastructure.security.JwtService
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -27,17 +25,13 @@ import java.time.ZoneId
 @Service
 class EventServiceImpl(
     private val eventRepository: EventRepository,
-    private val userRepository: UserRepository
+    private val jwtService: JwtService,
 ) : EventService {
     private val logger = LoggerFactory.getLogger(EventServiceImpl::class.java)
 
     @Transactional
-    override fun createEvent(request: CreateEventRequest): Event {
-        val organizerEmail = request.organizerEmail
-
-        val organizer = userRepository.findByUsernameOrEmail(organizerEmail, organizerEmail)
-            ?: throw UserNotFoundException(organizerEmail, "Organizer not found")
-
+    override fun createEvent(request: CreateEventRequest, token: String): Event {
+        val userId = jwtService.extractUserId(token)
 
         val eventEntity = EventEntity(
             title = request.title,
@@ -46,9 +40,9 @@ class EventServiceImpl(
             endDate = request.endDate,
             location = request.location,
             status = EventStatus.DRAFT,
-            organizer = organizer,
-            createdBy = organizer.id ?: request.createdBy,
-            updatedBy = organizer.id ?: request.createdBy,
+            organizerId = userId,
+            createdBy = userId,
+            updatedBy = userId,
         )
 
         val tiers = request.ticketTiers.map { tierReq ->
@@ -60,8 +54,8 @@ class EventServiceImpl(
                 validFrom = tierReq.validFrom,
                 validUntil = tierReq.validUntil,
                 event = eventEntity,
-                createdBy = organizer.id ?: request.createdBy,
-                updatedBy = organizer.id ?: request.createdBy,
+                createdBy = userId,
+                updatedBy = userId,
             )
         }
 
@@ -92,11 +86,9 @@ class EventServiceImpl(
     }
 
     @Transactional(readOnly = true)
-    override fun getMyEvents(organizerEmail: String, pageable: Pageable): Page<EventDTO> {
-        val organizer = userRepository.findByUsernameOrEmail(organizerEmail, organizerEmail)
-            ?: throw UserNotFoundException(organizerEmail, "User not found")
-
-        return eventRepository.findByOrganizerId(organizer.id!!, pageable)
+    override fun getMyEvents(pageable: Pageable, token: String): Page<EventDTO> {
+        val userId = jwtService.extractUserId(token)
+        return eventRepository.findByOrganizerId(userId, pageable)
             .map { it.toDomain().toDTO() }
     }
 
@@ -104,14 +96,16 @@ class EventServiceImpl(
     override fun updateEvent(
         eventId: Long,
         request: UpdateEventRequest,
-        userEmail: String,
-        isAdmin: Boolean
+        token: String
     ): EventDTO {
+        val userId = jwtService.extractUserId(token)
+        val isAdmin = jwtService.hasAnyRole(token, "ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+
         val event = eventRepository.findById(eventId)
             .orElseThrow { EventNotFoundException("Event not found") }
 
         // 1. Security Check: Ownership
-        validateOwnership(event, userEmail, isAdmin)
+        validateOwnership(event, userId, isAdmin)
 
         // 2. Business Rule: Cannot change dates if tickets are sold
         val hasSoldTickets = event.ticketTiers.any { it.totalAllocation != it.availableAllocation }
@@ -145,13 +139,14 @@ class EventServiceImpl(
     override fun changeEventStatus(
         eventId: Long,
         status: EventStatus,
-        userEmail: String,
-        isAdmin: Boolean
+        token: String
     ): EventDTO {
         val event = eventRepository.findById(eventId)
             .orElseThrow { EventNotFoundException("Event not found") }
 
-        validateOwnership(event, userEmail, isAdmin)
+        val userId = jwtService.extractUserId(token)
+        val isAdmin = jwtService.hasAnyRole(token, "ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+        validateOwnership(event, userId, isAdmin)
 
         val hasSoldTickets = event.ticketTiers.any { it.totalAllocation != it.availableAllocation }
         // Rule 1: If tickets are sold, you CANNOT go back to DRAFT.
@@ -178,18 +173,19 @@ class EventServiceImpl(
     }
 
     @Transactional
-    override fun deleteEvent(eventId: Long, userEmail: String, isAdmin: Boolean) {
-        val user = userRepository.findByUsernameOrEmail(userEmail, userEmail)
-            ?: throw UserNotFoundException(userEmail, "User not found")
+    override fun deleteEvent(eventId: Long, token: String) {
+        val userId = jwtService.extractUserId(token)
 
         val event = eventRepository.findById(eventId)
             .orElseThrow { EventNotFoundException("Event not found") }
+        
+        val isAdmin = jwtService.hasAnyRole(token, "ROLE_ADMIN", "ROLE_SUPER_ADMIN")
 
-        validateOwnership(event, userEmail, isAdmin)
+        validateOwnership(event, userId, isAdmin)
         assertEventNotLocked(event)
 
         // Soft Delete
-        event.markDeleted(user.toDomain().id!!)
+        event.markDeleted(userId)
         try {
             eventRepository.save(event)
         } catch (e: Exception) {
@@ -198,10 +194,10 @@ class EventServiceImpl(
         }
     }
 
-    private fun validateOwnership(event: EventEntity, userEmail: String, isAdmin: Boolean) {
+    private fun validateOwnership(event: EventEntity, userId: Long, isAdmin: Boolean) {
         if (isAdmin) return // Admins can touch anything
 
-        if (event.organizer.email != userEmail && event.organizer.username != userEmail) {
+        if (event.organizerId != userId ) {
             throw UnauthorizedEventAccessException("Access Denied: You are not the organizer of this event or admin.")
         }
     }

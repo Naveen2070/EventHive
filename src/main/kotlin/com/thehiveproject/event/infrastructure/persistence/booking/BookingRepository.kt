@@ -24,15 +24,14 @@ interface BookingRepository : JpaRepository<BookingEntity, Long> {
             b.id AS id,
             e.title AS eventName,
             t.name AS tierName,  
-            u.username AS customerName,
+            b.userId AS userId, 
             b.ticketsCount AS tickets,
             b.totalPrice AS amount,
             b.createdAt AS date
         FROM BookingEntity b
         JOIN b.event e
         JOIN b.ticketTier t      
-        JOIN b.user u
-        WHERE e.organizer.id = :organizerId
+        WHERE e.organizerId = :organizerId
         AND b.status = com.thehiveproject.event.domain.booking.BookingStatus.CONFIRMED
         ORDER BY b.createdAt DESC
     """)
@@ -48,7 +47,7 @@ interface BookingRepository : JpaRepository<BookingEntity, Long> {
             COALESCE(SUM(b.totalPrice), 0) AS revenue
         FROM BookingEntity b
         JOIN b.event e
-        WHERE e.organizer.id = :organizerId
+        WHERE e.organizerId = :organizerId
         AND b.status = com.thehiveproject.event.domain.booking.BookingStatus.CONFIRMED
         GROUP BY CAST(b.createdAt AS LocalDate)
         ORDER BY CAST(b.createdAt AS LocalDate) ASC
@@ -62,7 +61,7 @@ interface BookingRepository : JpaRepository<BookingEntity, Long> {
         SELECT COALESCE(SUM(b.totalPrice), 0)
         FROM BookingEntity b
         JOIN b.event e
-        WHERE e.organizer.id = :organizerId
+        WHERE e.organizerId = :organizerId
         AND b.status = com.thehiveproject.event.domain.booking.BookingStatus.CONFIRMED
     """)
     fun getTotalRevenue(organizerId: Long): Double
@@ -72,7 +71,7 @@ interface BookingRepository : JpaRepository<BookingEntity, Long> {
         SELECT COALESCE(SUM(b.ticketsCount), 0)
         FROM BookingEntity b
         JOIN b.event e
-        WHERE e.organizer.id = :organizerId
+        WHERE e.organizerId = :organizerId
         AND b.status IN (
             com.thehiveproject.event.domain.booking.BookingStatus.CONFIRMED,
             com.thehiveproject.event.domain.booking.BookingStatus.PENDING_PAYMENT
@@ -85,7 +84,7 @@ interface BookingRepository : JpaRepository<BookingEntity, Long> {
         SELECT COALESCE(SUM(b.ticketsCount), 0)
         FROM BookingEntity b
         JOIN b.event e
-        WHERE e.organizer.id = :organizerId
+        WHERE e.organizerId = :organizerId
         AND b.status = com.thehiveproject.event.domain.booking.BookingStatus.PENDING_PAYMENT
     """)
     fun getPendingPaymentTickets(organizerId: Long): Long
@@ -95,7 +94,7 @@ interface BookingRepository : JpaRepository<BookingEntity, Long> {
         SELECT COALESCE(SUM(b.ticketsCount), 0)
         FROM BookingEntity b
         JOIN b.event e
-        WHERE e.organizer.id = :organizerId
+        WHERE e.organizerId = :organizerId
         AND b.status = com.thehiveproject.event.domain.booking.BookingStatus.CONFIRMED
         AND b.createdAt >= :fromDate
     """)
@@ -109,7 +108,7 @@ interface BookingRepository : JpaRepository<BookingEntity, Long> {
         SELECT COALESCE(SUM(b.totalPrice), 0)
         FROM BookingEntity b
         JOIN b.event e
-        WHERE e.organizer.id = :organizerId
+        WHERE e.organizerId = :organizerId
         AND b.status = com.thehiveproject.event.domain.booking.BookingStatus.CONFIRMED
         AND b.createdAt >= :fromDate
     """)

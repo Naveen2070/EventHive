@@ -8,11 +8,21 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 
 interface EventService {
-    fun createEvent(request: CreateEventRequest): Event
+    fun createEvent(request: CreateEventRequest, token: String): Event
     fun getAllEvents(pageable: Pageable, criteria: EventSearchCriteria): Page<EventDTO>
     fun getEventById(id: Long): EventDTO
-    fun getMyEvents(organizerEmail: String, pageable: Pageable): Page<EventDTO>
-    fun updateEvent(eventId: Long, request: UpdateEventRequest, userEmail: String, isAdmin: Boolean): EventDTO
-    fun changeEventStatus(eventId: Long, status: EventStatus, userEmail: String, isAdmin: Boolean): EventDTO
-    fun deleteEvent(eventId: Long, userEmail: String, isAdmin: Boolean)
+    fun getMyEvents(pageable: Pageable, token: String): Page<EventDTO>
+    fun updateEvent(
+        eventId: Long,
+        request: UpdateEventRequest,
+        token: String
+    ): EventDTO
+
+    fun changeEventStatus(
+        eventId: Long,
+        status: EventStatus,
+        token: String
+    ): EventDTO
+
+    fun deleteEvent(eventId: Long, token: String)
 }

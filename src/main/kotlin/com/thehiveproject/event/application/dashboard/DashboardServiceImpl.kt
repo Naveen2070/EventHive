@@ -4,12 +4,11 @@ import com.thehiveproject.event.api.dto.DashboardStatsDTO
 import com.thehiveproject.event.api.dto.RecentSaleDTO
 import com.thehiveproject.event.api.dto.RevenueTrendItem
 import com.thehiveproject.event.domain.dashboard.DashboardService
-import com.thehiveproject.event.domain.user.error.UserNotFoundException
 import com.thehiveproject.event.infrastructure.persistence.booking.BookingRepository
 import com.thehiveproject.event.infrastructure.persistence.booking.projection.RecentSaleProjection
 import com.thehiveproject.event.infrastructure.persistence.booking.projection.RevenueTrendProjection
 import com.thehiveproject.event.infrastructure.persistence.event.EventRepository
-import com.thehiveproject.event.infrastructure.persistence.user.UserRepository
+import com.thehiveproject.event.infrastructure.security.JwtService
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -21,24 +20,24 @@ import java.time.ZoneId
 class DashboardServiceImpl(
     private val bookingRepository: BookingRepository,
     private val eventRepository: EventRepository,
-    private val userRepository: UserRepository
+    private val jwtService: JwtService
 ) : DashboardService {
 
     @Transactional
-    override fun getOrganizerStats(organizerName: String): DashboardStatsDTO {
-        val organizer = userRepository.findByUsernameOrEmail(organizerName, organizerName)
-            ?: throw UserNotFoundException("Organizer not found")
-        val organizerId = organizer.id!!
+    override fun getOrganizerStats(token: String): DashboardStatsDTO {
 
-        val totalEvents = eventRepository.countByOrganizerId(organizerId)
+        val userId = jwtService.extractUserId(token)
+
+
+        val totalEvents = eventRepository.countByOrganizerId(userId)
         val activeEvents = eventRepository.countByOrganizerIdAndEndDateAfter(
-            organizerId,
+            userId,
             LocalDateTime.now()
         )
 
-        val totalRevenue = bookingRepository.getTotalRevenue(organizerId)
-        val totalTicketsSold = bookingRepository.getTotalTicketsSold(organizerId)
-        val pendingPaymentTickets = bookingRepository.getPendingPaymentTickets(organizerId)
+        val totalRevenue = bookingRepository.getTotalRevenue(userId)
+        val totalTicketsSold = bookingRepository.getTotalTicketsSold(userId)
+        val pendingPaymentTickets = bookingRepository.getPendingPaymentTickets(userId)
 
         // Convert LocalDateTime to Instant
         val now = Instant.now()
@@ -47,11 +46,11 @@ class DashboardServiceImpl(
         val oneMonthAgo = now.minusSeconds(30 * 24 * 60 * 60)
         val twoMonthsAgo = now.minusSeconds(60 * 24 * 60 * 60)
 
-        val ticketsSoldLastWeek = bookingRepository.getTicketsSoldSince(organizerId, oneWeekAgo)
-        val revenueLastWeek = bookingRepository.getRevenueSince(organizerId, oneWeekAgo)
-        val revenuePreviousWeek = bookingRepository.getRevenueSince(organizerId, twoWeeksAgo) - revenueLastWeek
-        val revenueLastMonth = bookingRepository.getRevenueSince(organizerId, oneMonthAgo)
-        val revenuePreviousMonth = bookingRepository.getRevenueSince(organizerId, twoMonthsAgo) - revenueLastMonth
+        val ticketsSoldLastWeek = bookingRepository.getTicketsSoldSince(userId, oneWeekAgo)
+        val revenueLastWeek = bookingRepository.getRevenueSince(userId, oneWeekAgo)
+        val revenuePreviousWeek = bookingRepository.getRevenueSince(userId, twoWeeksAgo) - revenueLastWeek
+        val revenueLastMonth = bookingRepository.getRevenueSince(userId, oneMonthAgo)
+        val revenuePreviousMonth = bookingRepository.getRevenueSince(userId, twoMonthsAgo) - revenueLastMonth
 
         fun growthPercent(current: Double, previous: Double): Double =
             if (previous == 0.0) 0.0 else ((current - previous) / previous) * 100
@@ -59,19 +58,19 @@ class DashboardServiceImpl(
         val revenueGrowthLastWeekPercent = growthPercent(revenueLastWeek, revenuePreviousWeek)
         val revenueGrowthLastMonthPercent = growthPercent(revenueLastMonth, revenuePreviousMonth)
 
-        val revenueTrend: List<RevenueTrendItem> = bookingRepository.getRevenueTrendProjected(organizerId)
+        val revenueTrend: List<RevenueTrendItem> = bookingRepository.getRevenueTrendProjected(userId)
             .map { it: RevenueTrendProjection ->
                 RevenueTrendItem(it.date, it.revenue)
             }
 
         val recentSales: List<RecentSaleDTO> = bookingRepository.findRecentSales(
-            organizerId,
+            userId,
             PageRequest.of(0, 5)
         ).map { it: RecentSaleProjection ->
             RecentSaleDTO(
                 it.id,
                 it.eventName,
-                it.customerName,
+                it.userId.toString(),
                 it.tierName,
                 it.tickets,
                 it.amount,

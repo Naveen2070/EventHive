@@ -4,8 +4,8 @@ import com.thehiveproject.event.api.dto.CreateTicketTierRequest
 import com.thehiveproject.event.api.dto.TicketTierDTO
 import com.thehiveproject.event.api.dto.UpdateTicketTierRequest
 import com.thehiveproject.event.api.mapper.toDTO
+import com.thehiveproject.event.api.utils.extractToken
 import com.thehiveproject.event.domain.event.TicketTierService
-import com.thehiveproject.event.domain.role.UserRole
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -14,10 +14,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
-import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 
 @RestController
@@ -45,12 +45,11 @@ class TicketTierController(
     fun addTierToEvent(
         @PathVariable eventId: Long,
         @Valid @RequestBody request: CreateTicketTierRequest,
-        authentication: Authentication
+        @RequestHeader(HttpHeaders .AUTHORIZATION) authHeader: String
     ): ResponseEntity<TicketTierDTO> {
-        val userEmail = authentication.name
-        val isAdmin = isAdmin(authentication)
+        val token = extractToken(authHeader)
 
-        val createdTier = ticketTierService.addTierToEvent(eventId, request, userEmail, isAdmin)
+        val createdTier = ticketTierService.addTierToEvent(eventId, request, token)
         return ResponseEntity.status(HttpStatus.CREATED).body(createdTier.toDTO())
     }
 
@@ -71,12 +70,11 @@ class TicketTierController(
     fun updateTier(
         @PathVariable tierId: Long,
         @Valid @RequestBody request: UpdateTicketTierRequest,
-        authentication: Authentication
+@RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String
     ): ResponseEntity<TicketTierDTO> {
-        val userEmail = authentication.name
-        val isAdmin = isAdmin(authentication)
+        val token = extractToken(authHeader)
 
-        val updatedTier = ticketTierService.updateTier(tierId, request, userEmail, isAdmin)
+        val updatedTier = ticketTierService.updateTier(tierId, request, token)
         return ResponseEntity.ok(updatedTier.toDTO())
     }
 
@@ -96,12 +94,11 @@ class TicketTierController(
     )
     fun deleteTier(
         @PathVariable tierId: Long,
-        authentication: Authentication
+@RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String
     ): ResponseEntity<Void> {
-        val userEmail = authentication.name
-        val isAdmin = isAdmin(authentication)
+        val token = extractToken(authHeader)
 
-        ticketTierService.deleteTier(tierId, userEmail, isAdmin)
+        ticketTierService.deleteTier(tierId, token)
         return ResponseEntity.noContent().build()
     }
 
@@ -125,15 +122,5 @@ class TicketTierController(
         val tier = ticketTierService.getTierById(tierId)
         val tierDTO = tier.toDTO()
         return ResponseEntity.ok(tierDTO)
-    }
-
-    private fun isAdmin(authentication: Authentication): Boolean {
-        val adminRoles = setOf(UserRole.ADMIN, UserRole.SUPER_ADMIN)
-
-        return authentication.authorities.any { authority ->
-            adminRoles.any { role ->
-                authority.authority == "ROLE_$role"
-            }
-        }
     }
 }

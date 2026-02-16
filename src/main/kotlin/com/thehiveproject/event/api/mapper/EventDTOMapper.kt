@@ -40,7 +40,6 @@ fun Event.toDTO(): EventDTO {
         },
         priceRange = priceRangeString,
         status = status,
-        organizerName = sanitizeForHtml(organizerName),
         organizerId = organizerId,
         createdAt = createdAt
     )

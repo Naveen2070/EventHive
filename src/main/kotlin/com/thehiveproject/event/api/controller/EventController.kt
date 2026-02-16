@@ -2,6 +2,7 @@ package com.thehiveproject.event.api.controller
 
 import com.thehiveproject.event.api.dto.*
 import com.thehiveproject.event.api.mapper.toDTO
+import com.thehiveproject.event.api.utils.extractToken
 import com.thehiveproject.event.domain.event.EventService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -13,10 +14,10 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
-import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -54,9 +55,11 @@ class EventController(
         @Valid
         @RequestBody
         @Parameter(description = "Event creation request payload", required = true)
+        @RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String,
         request: CreateEventRequest,
     ): ResponseEntity<EventDTO> {
-        val response = eventService.createEvent(request)
+        val token = extractToken(authHeader)
+        val response = eventService.createEvent(request,token)
         val responseDTO = response.toDTO()
         return ResponseEntity(responseDTO, HttpStatus.CREATED)
     }
@@ -158,12 +161,13 @@ class EventController(
     @GetMapping("/organizer")
     @PreAuthorize("hasRole('ORGANIZER')")
     fun getMyEvents(
-        authentication: Authentication,
         @Parameter(description = "Pagination information")
         @PageableDefault(size = 10, sort = ["createdAt"])
+        @RequestHeader(HttpHeaders .AUTHORIZATION) authHeader: String,
         pageable: Pageable
     ): ResponseEntity<PaginatedResponse<EventDTO>> {
-        val events = eventService.getMyEvents(authentication.name, pageable)
+        val token = extractToken(authHeader)
+        val events = eventService.getMyEvents(pageable,token)
         return ResponseEntity.ok(events.toPaginatedResponse())
     }
 
@@ -197,13 +201,11 @@ class EventController(
         @RequestBody
         @Parameter(description = "Event update request payload", required = true)
         request: UpdateEventRequest,
-        authentication: Authentication
+        @RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String
     ): ResponseEntity<EventDTO> {
-        val isAdmin = authentication.authorities.any {
-            it.authority == "ROLE_ADMIN" || it.authority == "ROLE_SUPER_ADMIN"
-        }
+       val token = extractToken(authHeader)
 
-        val response = eventService.updateEvent(id, request, authentication.name, isAdmin)
+        val response = eventService.updateEvent(id, request, token)
         return ResponseEntity.ok(response)
     }
 
@@ -235,17 +237,14 @@ class EventController(
         @RequestBody
         @Parameter(description = "Event status change request", required = true)
         request: ChangeEventStatusRequest,
-        authentication: Authentication
+        @RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String
     ): ResponseEntity<EventDTO> {
-        val isAdmin = authentication.authorities.any {
-            it.authority == "ROLE_ADMIN" || it.authority == "ROLE_SUPER_ADMIN"
-        }
+       val token = extractToken(authHeader)
 
         val response = eventService.changeEventStatus(
             id,
             request.status,
-            authentication.name,
-            isAdmin
+            token
         )
         return ResponseEntity.ok(response)
     }
@@ -267,13 +266,10 @@ class EventController(
     fun deleteEvent(
         @Parameter(description = "Event ID", required = true)
         @PathVariable id: Long,
-        authentication: Authentication
+        @RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String
     ): ResponseEntity<Void> {
-        val isAdmin = authentication.authorities.any {
-            it.authority == "ROLE_ADMIN" || it.authority == "ROLE_SUPER_ADMIN"
-        }
-
-        eventService.deleteEvent(id, authentication.name, isAdmin)
+        val token = extractToken(authHeader)
+        eventService.deleteEvent(id,token)
         return ResponseEntity.noContent().build()
     }
 }

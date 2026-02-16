@@ -1,6 +1,7 @@
 package com.thehiveproject.event.api.controller
 
 import com.thehiveproject.event.api.dto.DashboardStatsDTO
+import com.thehiveproject.event.api.utils.extractToken
 import com.thehiveproject.event.domain.dashboard.DashboardService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
@@ -9,10 +10,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.http.HttpHeaders
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
-import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
@@ -56,11 +58,11 @@ class DashboardController(
     @GetMapping("/stats")
     @PreAuthorize("hasRole('ORGANIZER')")
     fun getDashboardStats(
-        authentication: Authentication
+        @RequestHeader(HttpHeaders .AUTHORIZATION) authHeader: String
     ): ResponseEntity<DashboardStatsDTO> {
 
-        val organizerName = authentication.name
-        val stats = dashboardService.getOrganizerStats(organizerName)
+        val token = extractToken(authHeader)
+        val stats = dashboardService.getOrganizerStats(token)
 
         return ResponseEntity.ok(stats)
     }

@@ -3,7 +3,6 @@ package com.thehiveproject.event.integration
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.thehiveproject.event.TestcontainersConfiguration
 import com.thehiveproject.event.api.dto.LoginRequest
-import com.thehiveproject.event.api.dto.RegisterUserDTO
 import com.thehiveproject.event.api.dto.RoleAssignmentRequest
 import com.thehiveproject.event.infrastructure.persistence.role.RoleRepository
 import com.thehiveproject.event.infrastructure.persistence.role.UserRoleEntity

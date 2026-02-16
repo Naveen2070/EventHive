@@ -1,15 +1,11 @@
 package com.thehiveproject.event.api.error
 
-import com.thehiveproject.event.domain.auth.error.InvalidCredentialsException
-import com.thehiveproject.event.domain.auth.error.TokenExpiredException
-import com.thehiveproject.event.domain.auth.error.UnauthorizedUserException
+
 import com.thehiveproject.event.domain.booking.error.InsufficientSeatsException
 import com.thehiveproject.event.domain.booking.error.ResourceAccessDeniedException
 import com.thehiveproject.event.domain.booking.error.TicketAlreadyUsedException
 import com.thehiveproject.event.domain.booking.error.TicketInValidException
 import com.thehiveproject.event.domain.event.error.*
-import com.thehiveproject.event.domain.role.error.RoleNotFoundException
-import com.thehiveproject.event.domain.user.error.*
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -27,8 +23,6 @@ class GlobalExceptionHandler {
 
     // 1. Handle "Not Found" (404)
     @ExceptionHandler(
-        UserNotFoundException::class,
-        RoleNotFoundException::class,
         EventNotFoundException::class,
         TicketTierNotFoundException::class
     )
@@ -73,10 +67,7 @@ class GlobalExceptionHandler {
     @ExceptionHandler(
         TicketAlreadyUsedException::class,
         TicketInValidException::class,
-        InvalidTicketTierException::class,
-        InvalidResetTokenException::class,
-        ExpiredResetTokenException::class,
-        InvalidOldPasswordException::class,
+        InvalidTicketTierException::class
     )
     fun handleInValidTicket(
         ex: RuntimeException,
@@ -93,27 +84,6 @@ class GlobalExceptionHandler {
         return ResponseEntity(errorResponse, HttpStatus.BAD_REQUEST)
     }
 
-    // 4. Handle Authentication Errors (401)
-    @ExceptionHandler(
-        InvalidCredentialsException::class,
-        TokenExpiredException::class,
-        UnauthorizedUserException::class,
-        UnauthorizedUserAccessException::class
-    )
-    fun handleInvalidCredentials(
-        ex: RuntimeException,
-        request: WebRequest
-    ): ResponseEntity<ApiErrorResponse> {
-
-        val errorResponse = ApiErrorResponse(
-            status = HttpStatus.UNAUTHORIZED.value(),
-            error = HttpStatus.UNAUTHORIZED.reasonPhrase,
-            message = ex.message ?: "Authentication failed",
-            path = request.getDescription(false).replace("uri=", "")
-        )
-
-        return ResponseEntity(errorResponse, HttpStatus.UNAUTHORIZED)
-    }
 
     // 5. Handle Forbidden Errors (403)
     @ExceptionHandler(
@@ -137,7 +107,6 @@ class GlobalExceptionHandler {
 
     // 6. Handle Business Rule Conflicts (409)
     @ExceptionHandler(
-        UserAlreadyExistsException::class,
         EventNotPublishedException::class,
         EventAlreadyStartedException::class,
         InsufficientSeatsException::class,
