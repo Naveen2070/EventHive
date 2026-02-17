@@ -2,8 +2,8 @@ package com.thehiveproject.event.integration
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.thehiveproject.event.TestcontainersConfiguration
+import com.thehiveproject.event.api.dto.BookingDTO
 import com.thehiveproject.event.api.dto.CreateBookingRequest
-import com.thehiveproject.event.api.dto.LoginRequest
 import com.thehiveproject.event.api.dto.PaymentWebhookPayload
 import com.thehiveproject.event.api.dto.UpdateBookingStatusRequest
 import com.thehiveproject.event.domain.booking.BookingStatus
@@ -13,20 +13,18 @@ import com.thehiveproject.event.infrastructure.persistence.event.EventEntity
 import com.thehiveproject.event.infrastructure.persistence.event.EventRepository
 import com.thehiveproject.event.infrastructure.persistence.event.TicketTierEntity
 import com.thehiveproject.event.infrastructure.persistence.event.TicketTierRepository
-import com.thehiveproject.event.infrastructure.persistence.role.RoleEntity
-import com.thehiveproject.event.infrastructure.persistence.role.RoleRepository
-import com.thehiveproject.event.infrastructure.persistence.role.UserRoleEntity
-import com.thehiveproject.event.infrastructure.persistence.user.UserEntity
-import com.thehiveproject.event.infrastructure.persistence.user.UserRepository
+import io.jsonwebtoken.Jwts
+import io.jsonwebtoken.io.Decoders
+import io.jsonwebtoken.security.Keys
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
-import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
@@ -35,6 +33,8 @@ import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import java.math.BigDecimal
 import java.time.LocalDateTime
+import java.util.Date
+import javax.crypto.SecretKey
 
 @ActiveProfiles("test")
 @SpringBootTest
@@ -58,20 +58,18 @@ class BookingControllerIntegrationTest {
     @Autowired
     lateinit var ticketTierRepository: TicketTierRepository
 
-    @Autowired
-    lateinit var userRepository: UserRepository
-
-    @Autowired
-    lateinit var roleRepository: RoleRepository
-
-    @Autowired
-    lateinit var passwordEncoder: PasswordEncoder
+    // Read the secret from test properties to sign tokens
+    @Value("\${jwt.secret}")
+    private lateinit var jwtSecret: String
 
     // Test Data
     private lateinit var userToken: String
     private lateinit var adminToken: String
     private var eventId: Long = 0
     private var ticketTierId: Long = 0
+    private val organizerId: Long = 2222
+    private val userId: Long = 101
+    private val adminId: Long = 999
 
     @BeforeEach
     fun setup() {
@@ -79,47 +77,23 @@ class BookingControllerIntegrationTest {
         bookingRepository.deleteAll()
         ticketTierRepository.deleteAll()
         eventRepository.deleteAll()
-        userRepository.deleteAll()
 
-        // 2. Roles
-        val roleAdmin = roleRepository.findByName("ADMIN")
-            ?: roleRepository.save(RoleEntity(name = "ADMIN", createdBy = 0, updatedBy = 0))
-        val roleUser = roleRepository.findByName("USER")
-            ?: roleRepository.save(RoleEntity(name = "USER", createdBy = 0, updatedBy = 0))
-        val roleOrg = roleRepository.findByName("ORGANIZER")
-            ?: roleRepository.save(RoleEntity(name = "ORGANIZER", createdBy = 0, updatedBy = 0))
-
-        // 3. Create Organizer & Event
-        val organizer = userRepository.save(
-            UserEntity(
-                username = "org",
-                email = "org@test.com",
-                password = passwordEncoder.encode("x"),
-                createdBy = 0L,
-                updatedBy = 0L
-            )
-        )
-        // Add role to organizer
-        userRepository.save(organizer.apply {
-            this.userRoles.add(UserRoleEntity(user = this, role = roleOrg, createdBy = 0, updatedBy = 0))
-        })
-
-        // Create Event
+        // 2. Create Event
         var event = EventEntity(
             title = "Rock Concert",
             description = "Live",
             startDate = LocalDateTime.now().plusDays(5),
             endDate = LocalDateTime.now().plusDays(6),
             location = "Stadium",
-            organizer = organizer,
-            createdBy = organizer.id!!,
-            updatedBy = organizer.id!!,
-            status = EventStatus.PUBLISHED // Must be PUBLISHED to book
+            organizerId = organizerId,
+            status = EventStatus.PUBLISHED,
+            createdBy = organizerId,
+            updatedBy = organizerId
         )
         event = eventRepository.save(event)
         eventId = event.id!!
 
-        // Create Ticket Tier
+        // 3. Create Ticket Tier
         var ticketTier = TicketTierEntity(
             name = "General",
             price = BigDecimal(100),
@@ -128,47 +102,34 @@ class BookingControllerIntegrationTest {
             validFrom = LocalDateTime.now(),
             validUntil = LocalDateTime.now().plusDays(10),
             event = event,
-            createdBy = organizer.id!!,
-            updatedBy = organizer.id!!
+            createdBy = organizerId,
+            updatedBy = organizerId
         )
         ticketTier = ticketTierRepository.save(ticketTier)
         ticketTierId = ticketTier.id!!
 
-        // 4. Create Users & Tokens
-        userToken = registerAndLogin("fan", "fan@test.com", "pass@123", roleUser)
-        adminToken = registerAndLogin("admin", "admin@test.com", "pass@1234", roleAdmin)
+        // 4. Generate Tokens (Stateless - No DB insert needed!)
+        userToken = generateTestToken(userId, "fan@test.com", listOf("ROLE_USER"))
+        adminToken = generateTestToken(adminId, "admin@test.com", listOf("ROLE_ADMIN"))
     }
 
-    private fun registerAndLogin(username: String, email: String, pass: String, role: RoleEntity): String {
-        var user = UserEntity(
-            username = username,
-            email = email,
-            password = passwordEncoder.encode(pass),
-            createdBy = 0L,
-            updatedBy = 0L
-        )
-        user = userRepository.save(user)
-        user.userRoles.add(
-            UserRoleEntity(
-                user = user,
-                role = role,
-                createdBy = 0L,
-                updatedBy = 0L
-            )
-        )
-        userRepository.save(user)
+    // Helper to generate a valid JWT for testing
+    private fun generateTestToken(id: Long, email: String, roles: List<String>): String {
+        val keyBytes = Decoders.BASE64.decode(jwtSecret)
+        val key: SecretKey = Keys.hmacShaKeyFor(keyBytes)
 
-        val loginResult = mockMvc.post("/api/auth/login") {
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(LoginRequest(email, pass))
-        }.andReturn()
-
-        return objectMapper.readTree(loginResult.response.contentAsString).get("token").asText()
+        return Jwts.builder()
+            .subject(email)
+            .claim("id", id)
+            .claim("roles", roles)
+            .issuedAt(Date())
+            .expiration(Date(System.currentTimeMillis() + 1000 * 60 * 60))
+            .signWith(key)
+            .compact()
     }
 
     @Test
     fun `should create a booking successfully and decrease seats`() {
-        // Need to provide ticketTierId now
         val request = CreateBookingRequest(eventId = eventId, ticketTierId = ticketTierId, ticketsCount = 2)
 
         mockMvc.post("/api/bookings") {
@@ -179,11 +140,9 @@ class BookingControllerIntegrationTest {
             status { isCreated() }
             jsonPath("$.status") { value("PENDING_PAYMENT") }
             jsonPath("$.ticketsCount") { value(2) }
-        }.andReturn()
+        }
 
         // Verify Inventory in DB
-        // NOTE: We need to check the TICKET TIER inventory, NOT the Event inventory directly if your logic is tier-based.
-        // Assuming your updated logic (from ServiceImpl) decreases ticketTier.availableAllocation
         val updatedTier = ticketTierRepository.findById(ticketTierId).get()
         assertEquals(8, updatedTier.availableAllocation, "Should have 8 seats left (10 - 2)")
     }
@@ -210,7 +169,7 @@ class BookingControllerIntegrationTest {
 
     @Test
     fun `user should be able to CANCEL their own booking`() {
-        // 1. Create Booking (Seats = 8)
+        // 1. Create Booking
         val createReq = CreateBookingRequest(eventId = eventId, ticketTierId = ticketTierId, ticketsCount = 2)
         val createRes = mockMvc.post("/api/bookings") {
             header("Authorization", "Bearer $userToken")
@@ -218,7 +177,12 @@ class BookingControllerIntegrationTest {
             content = objectMapper.writeValueAsString(createReq)
         }.andReturn()
 
-        val bookingId = objectMapper.readTree(createRes.response.contentAsString).get("bookingId").asLong()
+        val createResponse = objectMapper.readValue(
+            createRes.response.contentAsString,
+            BookingDTO::class.java
+        )
+
+        val bookingId = createResponse.bookingId
 
         // 2. Cancel Booking
         val updateRequest = UpdateBookingStatusRequest(status = BookingStatus.CANCELLED)
@@ -232,7 +196,7 @@ class BookingControllerIntegrationTest {
             jsonPath("$.status") { value("CANCELLED") }
         }
 
-        // 3. Verify Seats Restored (Seats = 10)
+        // 3. Verify Seats Restored
         val tier = ticketTierRepository.findById(ticketTierId).get()
         assertEquals(10, tier.availableAllocation, "Seats should be restored after cancellation")
     }
@@ -245,17 +209,24 @@ class BookingControllerIntegrationTest {
             contentType = MediaType.APPLICATION_JSON
             content = objectMapper.writeValueAsString(CreateBookingRequest(eventId, ticketTierId, 1))
         }.andReturn()
-        val bookingId = objectMapper.readTree(createRes.response.contentAsString).get("bookingId").asLong()
 
-        // 2. User tries to confirm their own booking (Illegal!)
+        val createResponse = objectMapper.readValue(
+            createRes.response.contentAsString,
+            BookingDTO::class.java
+        )
+
+        val bookingId = createResponse.bookingId
+
+
+        // 2. User tries to confirm their own booking
         val updateRequest = UpdateBookingStatusRequest(status = BookingStatus.CONFIRMED)
 
         mockMvc.patch("/api/bookings/status/$bookingId") {
-            header("Authorization", "Bearer $userToken") // User Token
+            header("Authorization", "Bearer $userToken")
             contentType = MediaType.APPLICATION_JSON
             content = objectMapper.writeValueAsString(updateRequest)
         }.andExpect {
-            status { isForbidden() } // Your Service throws ResourceAccessDeniedException which maps to 403 Forbidden
+            status { isForbidden() } // 403 Forbidden
         }
     }
 
@@ -267,7 +238,14 @@ class BookingControllerIntegrationTest {
             contentType = MediaType.APPLICATION_JSON
             content = objectMapper.writeValueAsString(CreateBookingRequest(eventId, ticketTierId, 1))
         }.andReturn()
-        val bookingId = objectMapper.readTree(createRes.response.contentAsString).get("bookingId").asLong()
+
+        val createResponse = objectMapper.readValue(
+            createRes.response.contentAsString,
+            BookingDTO::class.java
+        )
+
+        val bookingId = createResponse.bookingId
+
 
         // 2. Admin Confirms it
         val updateRequest = UpdateBookingStatusRequest(status = BookingStatus.CONFIRMED)
@@ -291,10 +269,15 @@ class BookingControllerIntegrationTest {
             content = objectMapper.writeValueAsString(CreateBookingRequest(eventId, ticketTierId, 1))
         }.andReturn()
 
-        val ref = objectMapper.readTree(createRes.response.contentAsString).get("bookingReference").asText()
-        val id = objectMapper.readTree(createRes.response.contentAsString).get("bookingId").asLong()
+        val createResponse = objectMapper.readValue(
+            createRes.response.contentAsString,
+            BookingDTO::class.java
+        )
 
-        // 2. Simulate Stripe Webhook
+        val ref = createResponse.bookingReference
+        val id = createResponse.bookingId
+
+        // 2. Simulate Webhook
         val webhookPayload = PaymentWebhookPayload(
             bookingReference = ref,
             paymentId = "pay_123",
@@ -309,7 +292,6 @@ class BookingControllerIntegrationTest {
         }
 
         // 3. Verify Booking is now CONFIRMED
-        // Need to fetch fresh from DB
         val booking = bookingRepository.findById(id).get()
         assertEquals(BookingStatus.CONFIRMED, booking.status)
     }

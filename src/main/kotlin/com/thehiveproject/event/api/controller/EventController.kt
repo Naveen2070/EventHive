@@ -52,11 +52,9 @@ class EventController(
     @PostMapping
     @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN', 'SUPER_ADMIN')")
     fun createEvent(
-        @Valid
-        @RequestBody
-        @Parameter(description = "Event creation request payload", required = true)
         @RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String,
-        request: CreateEventRequest,
+        @Parameter(description = "Event creation request payload", required = true)
+        @Valid @RequestBody request: CreateEventRequest,
     ): ResponseEntity<EventDTO> {
         val token = extractToken(authHeader)
         val response = eventService.createEvent(request,token)
