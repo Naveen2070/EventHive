@@ -7,15 +7,13 @@ import org.springframework.stereotype.Component
 
 @Component
 class BookingEventListener(
-    private val emailService: EmailService
+    private val notificationProducer: NotificationProducer
 ) {
     @Async
     @EventListener
     fun handleBookingSuccess(event: BookingSuccessEvent) {
-        // Simulate a delay to prove it doesn't block the API
-        // Thread.sleep(5000)
-        emailService.sendBookingConfirmation(
-            to = event.userEmail,
+        notificationProducer.sendBookingConfirmation(
+            recipientEmail = event.userEmail,
             booking = event.booking
         )
     }
