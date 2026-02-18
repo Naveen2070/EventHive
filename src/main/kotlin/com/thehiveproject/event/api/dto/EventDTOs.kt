@@ -66,7 +66,8 @@ data class EventDTO(
     val ticketTiers: List<TicketTierDTO>,
     val priceRange: String,
     val status: EventStatus,
-    val organizerId: Long,
+    val organizerId: String,
+    val organizerName: String,
     val createdAt: Instant
 )
 

@@ -40,7 +40,8 @@ fun Event.toDTO(): EventDTO {
         },
         priceRange = priceRangeString,
         status = status,
-        organizerId = organizerId,
+        organizerId = organizerId.toString(),
+        organizerName = organizerName,
         createdAt = createdAt
     )
 }

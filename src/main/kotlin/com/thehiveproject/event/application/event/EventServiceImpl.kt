@@ -4,6 +4,7 @@ import com.thehiveproject.event.api.dto.CreateEventRequest
 import com.thehiveproject.event.api.dto.EventDTO
 import com.thehiveproject.event.api.dto.EventSearchCriteria
 import com.thehiveproject.event.api.dto.UpdateEventRequest
+import com.thehiveproject.event.api.dto.UserSummaryDTO
 import com.thehiveproject.event.api.mapper.toDTO
 import com.thehiveproject.event.domain.event.Event
 import com.thehiveproject.event.domain.event.EventService
@@ -12,6 +13,7 @@ import com.thehiveproject.event.domain.event.error.EventDateChangeNotAllowedExce
 import com.thehiveproject.event.domain.event.error.EventModificationNotAllowedException
 import com.thehiveproject.event.domain.event.error.EventNotFoundException
 import com.thehiveproject.event.domain.event.error.UnauthorizedEventAccessException
+import com.thehiveproject.event.infrastructure.persistence.client.IdentityClient
 import com.thehiveproject.event.infrastructure.persistence.event.*
 import com.thehiveproject.event.infrastructure.security.JwtService
 import org.slf4j.LoggerFactory
@@ -26,6 +28,7 @@ import java.time.ZoneId
 class EventServiceImpl(
     private val eventRepository: EventRepository,
     private val jwtService: JwtService,
+    private val identityClient: IdentityClient
 ) : EventService {
     private val logger = LoggerFactory.getLogger(EventServiceImpl::class.java)
 
@@ -63,7 +66,8 @@ class EventServiceImpl(
 
         try {
             val savedEvent = eventRepository.save(eventEntity)
-            return savedEvent.toDomain()
+            val userData = identityClient.getUsersById(savedEvent.organizerId)
+            return savedEvent.toDomain(userData)
         } catch (e: Exception) {
             logger.error("Failed to create event: ${e.message}")
             throw RuntimeException("Failed to create event: ${e.message}")
@@ -73,23 +77,37 @@ class EventServiceImpl(
     @Transactional(readOnly = true)
     override fun getAllEvents(pageable: Pageable, criteria: EventSearchCriteria): Page<EventDTO> {
         val specification = EventSpecification.withCriteria(criteria)
-        return eventRepository.findAll(specification, pageable)
-            .map { it.toDomain().toDTO() }
+        val eventsPage = eventRepository.findAll(specification, pageable)
+        val usersMap = fetchOrganizersMap(eventsPage.content)
+
+        return eventsPage.map { event ->
+            val userData = usersMap[event.organizerId]
+                ?: defaultOrganizer(event.organizerId)
+
+            event.toDomain(userData).toDTO()
+        }
     }
 
     @Transactional(readOnly = true)
     override fun getEventById(id: Long): EventDTO {
         val event = eventRepository.findById(id)
             .orElseThrow { EventNotFoundException("Event not found with ID: $id") }
-
-        return event.toDomain().toDTO()
+        val userData = identityClient.getUsersById(event.organizerId)
+        return event.toDomain(userData).toDTO()
     }
 
     @Transactional(readOnly = true)
     override fun getMyEvents(pageable: Pageable, token: String): Page<EventDTO> {
         val userId = jwtService.extractUserId(token)
-        return eventRepository.findByOrganizerId(userId, pageable)
-            .map { it.toDomain().toDTO() }
+        val eventsPage = eventRepository.findByOrganizerId(userId, pageable)
+        val usersMap = fetchOrganizersMap(eventsPage.content)
+
+        return eventsPage.map { event ->
+            val userData = usersMap[event.organizerId]
+                ?: defaultOrganizer(event.organizerId)
+
+            event.toDomain(userData).toDTO()
+        }
     }
 
     @Transactional
@@ -128,7 +146,8 @@ class EventServiceImpl(
 
         try {
             val savedEvent = eventRepository.save(event)
-            return savedEvent.toDomain().toDTO()
+            val userData = identityClient.getUsersById(savedEvent.organizerId)
+            return savedEvent.toDomain(userData).toDTO()
         } catch (e: Exception) {
             logger.error("Failed to update event: ${e.message}")
             throw RuntimeException("Failed to update event: ${e.message}")
@@ -165,7 +184,8 @@ class EventServiceImpl(
         event.status = status
         try {
             val savedEvent = eventRepository.save(event)
-            return savedEvent.toDomain().toDTO()
+            val userData = identityClient.getUsersById(savedEvent.organizerId)
+            return savedEvent.toDomain(userData).toDTO()
         } catch (e: Exception) {
             logger.error("Failed to change event status: ${e.message}")
             throw RuntimeException("Failed to change event status: ${e.message}")
@@ -214,4 +234,18 @@ class EventServiceImpl(
         }
     }
 
+    private fun fetchOrganizersMap(events: List<EventEntity>): Map<Long, UserSummaryDTO> {
+        val organizerIds = events.map { it.organizerId }.distinct()
+
+        return identityClient.getUsersByIds(organizerIds)
+            .associateBy { it.id }
+    }
+
+    private fun defaultOrganizer(organizerId: Long): UserSummaryDTO {
+        return UserSummaryDTO(
+            id = organizerId,
+            fullName = "Unknown Organizer",
+            email = "organizer@unknown.com"
+        )
+    }
 }

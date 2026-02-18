@@ -15,6 +15,7 @@ import com.thehiveproject.event.domain.event.error.*
 import com.thehiveproject.event.infrastructure.persistence.booking.BookingRepository
 import com.thehiveproject.event.infrastructure.persistence.booking.toDomain
 import com.thehiveproject.event.infrastructure.persistence.booking.toEntity
+import com.thehiveproject.event.infrastructure.persistence.client.IdentityClient
 import com.thehiveproject.event.infrastructure.persistence.event.EventRepository
 import com.thehiveproject.event.infrastructure.persistence.event.TicketTierRepository
 import com.thehiveproject.event.infrastructure.persistence.event.toDomain
@@ -39,6 +40,7 @@ class BookingServiceImpl(
     private val eventRepository: EventRepository,
     private val ticketTierRepository: TicketTierRepository,
     private val eventPublisher: ApplicationEventPublisher,
+    private val identityClient: IdentityClient,
     private val jwtService: JwtService
 ) : BookingService {
 
@@ -84,10 +86,12 @@ class BookingServiceImpl(
             throw InsufficientSeatsException(request.ticketsCount, tierEntity.availableAllocation)
         }
 
+        val userData = identityClient.getUsersById(eventEntity.organizerId)
+
         // 6. Create Domain Object (Using your Domain Logic)
         val bookingDomain = Booking.create(
             userId,
-            event = eventEntity.toDomain(),
+            event = eventEntity.toDomain(userData),
             tier = tierEntity,
             ticketsCount = request.ticketsCount,
             createdBy = userId

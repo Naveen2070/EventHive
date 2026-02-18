@@ -26,6 +26,7 @@ data class Event(
     val ticketTiers: List<TicketTier>,
     val status: EventStatus,
     val organizerId: Long,
+    val organizerName: String,
     val createdBy: Long,
     val updatedBy: Long,
     val deletedBy: Long?,

@@ -1,5 +1,6 @@
 package com.thehiveproject.event.configuration
 
+import com.thehiveproject.event.infrastructure.security.InternalServiceFilter
 import com.thehiveproject.event.infrastructure.security.JwtAuthenticationFilter
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.context.annotation.Bean
@@ -19,6 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 class SecurityConfig(
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
+    private val internalServiceFilter: InternalServiceFilter
 ) {
 
     @Bean
@@ -36,7 +38,12 @@ class SecurityConfig(
                         "/scalar.html"
                     ).permitAll()
                     // auth endpoint
-                    .requestMatchers("/api/auth/**", "/api/user/forgot-password", "/api/user/reset-password").permitAll()
+                    .requestMatchers(
+                        "/api/auth/**",
+                        "/api/user/forgot-password",
+                        "/api/user/reset-password",
+                        "/api/internal/**",
+                    ).permitAll()
                     // payment webHook
                     .requestMatchers("/api/bookings/webhook/payment").permitAll()
                     // events public endpoints
@@ -59,6 +66,8 @@ class SecurityConfig(
                     .anyRequest().authenticated()
             }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
+            // add Internal service filter before JWT filter
+            .addFilterBefore(internalServiceFilter, UsernamePasswordAuthenticationFilter::class.java)
             // Add JWT filter before UsernamePasswordAuthenticationFilter
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
             .exceptionHandling { exceptions ->
