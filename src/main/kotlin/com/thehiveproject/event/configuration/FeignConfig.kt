@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import java.time.Instant
 
 @Configuration
 class FeignConfig(
@@ -19,14 +20,19 @@ class FeignConfig(
     @Bean
     fun requestInterceptor(): RequestInterceptor {
         return RequestInterceptor { template: RequestTemplate ->
-            // 1. Generate the secure token
-            val token = S2SAuthUtil.generateToken(serviceId, sharedSecret)
 
-            // 2. Attach Headers
+            // 1. Capture the exact second this request is being made
+            val currentTimestamp = Instant.now().epochSecond
+
+            // 2. Generate the HMAC signature
+            val signature = S2SAuthUtil.generateSignature(serviceId, currentTimestamp, sharedSecret)
+
+            // 3. Attach all three required headers
             template.header("X-Internal-Service-ID", serviceId)
-            template.header("X-Service-Token", token)
+            template.header("X-Service-Timestamp", currentTimestamp.toString())
+            template.header("X-Service-Signature", signature)
 
-            logger.debug("Attached S2S headers for service: $serviceId")
+            logger.debug("Attached S2S HMAC headers for service: $serviceId")
         }
     }
 }

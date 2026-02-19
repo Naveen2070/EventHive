@@ -1,51 +1,111 @@
 package com.thehiveproject.event.infrastructure.utils
 
 import java.security.MessageDigest
-import java.util.Base64
+import java.time.Instant
+import java.util.*
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
+import kotlin.math.abs
 
+/**
+ * Utility object for secure Service-to-Service (S2S) authentication.
+ *
+ * This implementation uses HMAC-SHA256 signatures combined with a timestamp
+ * to provide:
+ *
+ * - Strong cryptographic integrity (via HMAC)
+ * - Replay attack protection (via timestamp validation)
+ * - Timing attack resistance (via constant-time comparison)
+ *
+ * Signature Formula:
+ * `Base64(HMAC-SHA256(serviceId + ":" + timestamp, sharedSecret))`
+ *
+ * A valid request must include:
+ * - serviceId
+ * - timestamp (epoch seconds)
+ * - signature
+ *
+ * The server recalculates the signature and verifies:
+ * 1. The timestamp is within the allowed time window.
+ * 2. The signature matches using constant-time comparison.
+ */
 object S2SAuthUtil {
+
+    private const val HMAC_ALGO = "HmacSHA256"
+
     /**
-     * Generates a secure token for service-to-service authentication.
+     * The default maximum time window (in seconds) that a token is considered valid.
      *
-     * The token is created by hashing the combination of the service ID and
-     * the shared secret using SHA-256, then encoding the result in Base64.
-     *
-     * Formula: `Base64(SHA-256(serviceId + ":" + sharedSecret))`
-     *
-     * @param serviceId the unique identifier of the service
-     * @param sharedSecret the shared secret key associated with the service
-     * @return a Base64-encoded SHA-256 hash token
+     * This helps prevent replay attacks by rejecting tokens that are:
+     * - Too old
+     * - Too far in the future
      */
-    fun generateToken(serviceId: String, sharedSecret: String): String {
-        val payload = "$serviceId:$sharedSecret"
-        val digest = MessageDigest.getInstance("SHA-256")
-        val hashBytes = digest.digest(payload.toByteArray(Charsets.UTF_8))
+    private const val ALLOWED_CLOCK_SKEW_SECONDS = 60L
+
+    /**
+     * Generates a Base64-encoded HMAC-SHA256 signature for service-to-service authentication.
+     *
+     * The signature is created using the following formula:
+     *
+     * `Base64(HMAC-SHA256(serviceId + ":" + timestamp, sharedSecret))`
+     *
+     * @param serviceId the unique identifier of the calling service
+     * @param timestamp the request timestamp in epoch seconds
+     * @param sharedSecret the shared secret key associated with the service
+     * @return a Base64-encoded HMAC-SHA256 signature
+     */
+    fun generateSignature(serviceId: String, timestamp: Long, sharedSecret: String): String {
+        val payload = "$serviceId:$timestamp"
+        val secretKeySpec = SecretKeySpec(sharedSecret.toByteArray(Charsets.UTF_8), HMAC_ALGO)
+
+        val mac = Mac.getInstance(HMAC_ALGO)
+        mac.init(secretKeySpec)
+
+        val hashBytes = mac.doFinal(payload.toByteArray(Charsets.UTF_8))
         return Base64.getEncoder().encodeToString(hashBytes)
     }
 
     /**
-     * Compares a given token with a token generated from the service ID and shared secret.
-     * Uses a constant-time comparison to prevent timing attacks.
+     * Validates a service-to-service authentication token.
      *
-     * @param token the token to verify
-     * @param serviceId the unique identifier of the service
+     * Validation consists of:
+     *
+     * 1. **Replay protection** — Ensures the timestamp is within the allowed time window.
+     * 2. **Signature verification** — Recomputes the expected HMAC signature.
+     * 3. **Timing attack protection** — Uses constant-time comparison to avoid side-channel leaks.
+     *
+     * A token is considered valid only if:
+     * - The timestamp difference from the current time does not exceed [maxAgeSeconds].
+     * - The provided signature matches the expected signature.
+     *
+     * @param signature the Base64-encoded HMAC signature provided by the client
+     * @param serviceId the unique identifier of the calling service
+     * @param timestamp the request timestamp in epoch seconds
      * @param sharedSecret the shared secret key associated with the service
-     * @return true if the token matches, false otherwise
+     * @param maxAgeSeconds the allowed clock skew in seconds (default: 60 seconds)
+     * @return true if the token is valid and within the allowed time window, false otherwise
      */
-    fun compareToken(token: String, serviceId: String, sharedSecret: String): Boolean {
-        val generatedToken = generateToken(serviceId, sharedSecret)
-        return constantTimeEquals(generatedToken, token)
-    }
+    fun validateToken(
+        signature: String,
+        serviceId: String,
+        timestamp: Long,
+        sharedSecret: String,
+        maxAgeSeconds: Long = ALLOWED_CLOCK_SKEW_SECONDS
+    ): Boolean {
+        val now = Instant.now().epochSecond
 
-    /**
-     * Performs a constant-time comparison of two strings to prevent timing attacks.
-     */
-    private fun constantTimeEquals(a: String, b: String): Boolean {
-        if (a.length != b.length) return false
-        var result = 0
-        for (i in a.indices) {
-            result = result or (a[i].code xor b[i].code)
+        // 1. Replay Attack Prevention (Is the token too old or from the future?)
+        if (abs(now - timestamp) > maxAgeSeconds) {
+            return false
         }
-        return result == 0
+
+        // 2. Recalculate the expected signature
+        val expectedSignature = generateSignature(serviceId, timestamp, sharedSecret)
+
+        // 3. Constant-time comparison to prevent timing side-channel attacks
+        return MessageDigest.isEqual(
+            expectedSignature.toByteArray(Charsets.UTF_8),
+            signature.toByteArray(Charsets.UTF_8)
+        )
     }
 }

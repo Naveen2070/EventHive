@@ -14,7 +14,8 @@ import org.springframework.web.filter.OncePerRequestFilter
 class InternalServiceFilter(
     internalProperties: InternalProperties
 ) : OncePerRequestFilter() {
-    val sharedSecret = internalProperties.sharedSecret
+
+    private val sharedSecret = internalProperties.sharedSecret
 
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -22,30 +23,38 @@ class InternalServiceFilter(
         filterChain: FilterChain
     ) {
         val logger = LoggerFactory.getLogger(InternalServiceFilter::class.java)
-
         val path = request.requestURI
 
-        // 1. Only enforce on internal paths
         if (path.startsWith("/api/internal")) {
             val serviceId = request.getHeader("X-Internal-Service-ID")
-            val serviceToken = request.getHeader("X-Service-Token")
+            val signature = request.getHeader("X-Service-Signature")
+            val timestampStr = request.getHeader("X-Service-Timestamp")
 
-            // 2. Reject if headers are missing
-            if (serviceId.isNullOrBlank() || serviceToken.isNullOrBlank()) {
+            if (serviceId.isNullOrBlank() || signature.isNullOrBlank() || timestampStr.isNullOrBlank()) {
                 logger.warn("Blocked internal request to $path: Missing required S2S headers.")
                 response.sendError(HttpServletResponse.SC_FORBIDDEN, "Missing Internal Headers")
                 return
             }
 
-            // 3. Verify the token signature
-            val isValidToken = S2SAuthUtil.compareToken(
-                token = serviceToken,
-                serviceId,
-                sharedSecret
+            val timestamp = try {
+                timestampStr.toLong()
+            } catch (_: NumberFormatException) {
+                logger.warn("Blocked internal request to $path: Malformed timestamp.")
+                response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Malformed Timestamp")
+                return
+            }
+
+            // The True HMAC Verification
+            val isValidToken = S2SAuthUtil.validateToken(
+                signature = signature,
+                serviceId = serviceId,
+                timestamp = timestamp,
+                sharedSecret = sharedSecret
             )
-            if (isValidToken) {
-                logger.warn("Blocked internal request to $path: Invalid S2S token for service '$serviceId'.")
-                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Invalid Internal Token")
+
+            if (!isValidToken) {
+                logger.warn("Blocked internal request to $path: Invalid signature or expired token for '$serviceId'.")
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Invalid or Expired Internal Token")
                 return
             }
 
