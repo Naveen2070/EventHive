@@ -1,0 +1,15 @@
+package com.thehiveproject.event.configuration
+
+import org.springframework.context.annotation.Configuration
+import org.springframework.data.web.config.EnableSpringDataWebSupport
+import org.springframework.retry.annotation.EnableRetry
+import org.springframework.scheduling.annotation.EnableAsync
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
+
+@Configuration
+@EnableRetry
+@EnableAsync
+@EnableSpringDataWebSupport(
+    pageSerializationMode = EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO
+)
+class WebConfig : WebMvcConfigurer

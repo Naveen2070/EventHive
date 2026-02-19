@@ -6,8 +6,9 @@ plugins {
     id("io.spring.dependency-management") version "1.1.7"
     kotlin("plugin.jpa") version "1.9.25"
 }
+val springCloudVersion by extra("2025.0.1")
 
-group = "com.sam_the_dev"
+group = "com.thehiveproject"
 version = "0.0.1-SNAPSHOT"
 description = "EventHive - Event Management System"
 
@@ -36,7 +37,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-hateoas")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("org.springframework.boot:spring-boot-starter-mail")
+    implementation("org.springframework.boot:spring-boot-starter-amqp")
+    implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
 
     // Kotlin Support
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
@@ -70,7 +72,9 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.springframework.security:spring-security-test")
+    testImplementation("org.springframework.amqp:spring-rabbit-test")
 
+    testImplementation("org.testcontainers:rabbitmq")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
 
@@ -87,6 +91,11 @@ dependencies {
 kotlin {
     compilerOptions {
         freeCompilerArgs.addAll("-Xjsr305=strict")
+    }
+}
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.cloud:spring-cloud-dependencies:$springCloudVersion")
     }
 }
 

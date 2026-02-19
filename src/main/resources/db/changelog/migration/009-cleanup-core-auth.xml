@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet id="009-01-drop-auth-constraints" author="naveen">
+        <preConditions onFail="MARK_RAN">
+            <foreignKeyConstraintExists foreignKeyName="fk_event_organizer"/>
+        </preConditions>
+
+        <comment>Removing hard database dependencies on local app_users table</comment>
+
+        <dropForeignKeyConstraint baseTableName="events" constraintName="fk_event_organizer"/>
+    </changeSet>
+
+    <changeSet id="009-02-drop-booking-constraints" author="naveen">
+        <preConditions onFail="MARK_RAN">
+            <foreignKeyConstraintExists foreignKeyName="fk_bookings_user"/>
+        </preConditions>
+
+        <comment>Removing hard database dependencies on bookings</comment>
+
+        <dropForeignKeyConstraint baseTableName="bookings" constraintName="fk_bookings_user"/>
+    </changeSet>
+
+    <changeSet id="009-03-drop-dependent-tables" author="naveen">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="user_roles"/>
+        </preConditions>
+
+        <comment>Dropping tables that link users to roles</comment>
+
+        <dropTable tableName="user_roles" cascadeConstraints="true"/>
+    </changeSet>
+
+    <changeSet id="009-04-drop-reset-tokens" author="naveen">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="password_reset_tokens"/>
+        </preConditions>
+
+        <comment>Dropping password reset tokens</comment>
+
+        <dropTable tableName="password_reset_tokens" cascadeConstraints="true"/>
+    </changeSet>
+
+    <changeSet id="009-05-drop-roles" author="naveen">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="roles"/>
+        </preConditions>
+
+        <comment>Dropping roles table</comment>
+
+        <dropTable tableName="roles" cascadeConstraints="true"/>
+    </changeSet>
+
+    <changeSet id="009-06-drop-users" author="naveen">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="app_users"/>
+        </preConditions>
+
+        <comment>Dropping users table</comment>
+
+        <dropTable tableName="app_users" cascadeConstraints="true"/>
+    </changeSet>
+
+</databaseChangeLog>
