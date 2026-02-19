@@ -6,9 +6,11 @@ import com.thehiveproject.event.api.dto.BookingDTO
 import com.thehiveproject.event.api.dto.CreateBookingRequest
 import com.thehiveproject.event.api.dto.PaymentWebhookPayload
 import com.thehiveproject.event.api.dto.UpdateBookingStatusRequest
+import com.thehiveproject.event.api.dto.UserSummaryDTO
 import com.thehiveproject.event.domain.booking.BookingStatus
 import com.thehiveproject.event.domain.event.EventStatus
 import com.thehiveproject.event.infrastructure.persistence.booking.BookingRepository
+import com.thehiveproject.event.infrastructure.persistence.client.IdentityClient
 import com.thehiveproject.event.infrastructure.persistence.event.EventEntity
 import com.thehiveproject.event.infrastructure.persistence.event.EventRepository
 import com.thehiveproject.event.infrastructure.persistence.event.TicketTierEntity
@@ -19,6 +21,8 @@ import io.jsonwebtoken.security.Keys
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.`when`
+import org.mockito.kotlin.any
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -27,6 +31,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
@@ -58,6 +63,10 @@ class BookingControllerIntegrationTest {
     @Autowired
     lateinit var ticketTierRepository: TicketTierRepository
 
+    // Inject a MockBean to bypass real Feign HTTP calls
+    @MockitoBean
+    lateinit var identityClient: IdentityClient
+
     // Read the secret from test properties to sign tokens
     @Value("\${jwt.secret}")
     private lateinit var jwtSecret: String
@@ -78,7 +87,12 @@ class BookingControllerIntegrationTest {
         ticketTierRepository.deleteAll()
         eventRepository.deleteAll()
 
-        // 2. Create Event
+        // 2. Stub the Feign client responses
+        val mockUser = UserSummaryDTO(organizerId, "Test Organizer", "org@test.com")
+        `when`(identityClient.getUsersById(any())).thenReturn(mockUser)
+        `when`(identityClient.getUsersByIds(any())).thenReturn(listOf(mockUser))
+
+        // 3. Create Event
         var event = EventEntity(
             title = "Rock Concert",
             description = "Live",
@@ -93,7 +107,7 @@ class BookingControllerIntegrationTest {
         event = eventRepository.save(event)
         eventId = event.id!!
 
-        // 3. Create Ticket Tier
+        // 4. Create Ticket Tier
         var ticketTier = TicketTierEntity(
             name = "General",
             price = BigDecimal(100),
@@ -108,7 +122,7 @@ class BookingControllerIntegrationTest {
         ticketTier = ticketTierRepository.save(ticketTier)
         ticketTierId = ticketTier.id!!
 
-        // 4. Generate Tokens (Stateless - No DB insert needed!)
+        // 5. Generate Tokens (Stateless - No DB insert needed!)
         userToken = generateTestToken(userId, "fan@test.com", listOf("ROLE_USER"))
         adminToken = generateTestToken(adminId, "admin@test.com", listOf("ROLE_ADMIN"))
     }

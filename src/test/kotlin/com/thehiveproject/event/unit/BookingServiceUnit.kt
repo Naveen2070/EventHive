@@ -2,6 +2,7 @@ package com.thehiveproject.event.unit
 
 import com.thehiveproject.event.api.dto.CreateBookingRequest
 import com.thehiveproject.event.api.dto.PaymentWebhookPayload
+import com.thehiveproject.event.api.dto.UserSummaryDTO
 import com.thehiveproject.event.application.booking.BookingServiceImpl
 import com.thehiveproject.event.domain.booking.BookingStatus
 import com.thehiveproject.event.domain.booking.error.InsufficientSeatsException
@@ -10,6 +11,7 @@ import com.thehiveproject.event.domain.booking.event.BookingSuccessEvent
 import com.thehiveproject.event.domain.event.EventStatus
 import com.thehiveproject.event.infrastructure.persistence.booking.BookingEntity
 import com.thehiveproject.event.infrastructure.persistence.booking.BookingRepository
+import com.thehiveproject.event.infrastructure.persistence.client.IdentityClient
 import com.thehiveproject.event.infrastructure.persistence.event.EventEntity
 import com.thehiveproject.event.infrastructure.persistence.event.EventRepository
 import com.thehiveproject.event.infrastructure.persistence.event.TicketTierEntity
@@ -46,6 +48,9 @@ class BookingServiceUnitTest {
     @Mock
     lateinit var jwtService: JwtService
 
+    @Mock
+    lateinit var identityClient: IdentityClient
+
     @InjectMocks
     lateinit var bookingService: BookingServiceImpl
 
@@ -54,6 +59,8 @@ class BookingServiceUnitTest {
     private val organizerId = 100L
     private val userToken = "valid-user-token"
     private val userEmail = "fan@test.com"
+
+    private val mockOrganizer = UserSummaryDTO(organizerId, "Test Organizer", "org@test.com")
 
     private fun createEvent() = EventEntity(
         id = 100L,
@@ -97,6 +104,8 @@ class BookingServiceUnitTest {
         whenever(eventRepository.findById(100L)).thenReturn(Optional.of(event))
         whenever(ticketTierRepository.findById(50L)).thenReturn(Optional.of(tier))
 
+        whenever(identityClient.getUsersById(organizerId)).thenReturn(mockOrganizer)
+
         // Mock Save
         whenever(bookingRepository.save(any<BookingEntity>())).thenAnswer {
             val b = it.arguments[0] as BookingEntity
@@ -127,6 +136,7 @@ class BookingServiceUnitTest {
         val request = CreateBookingRequest(eventId = 100L, ticketTierId = 50L, ticketsCount = 5)
 
         whenever(jwtService.extractUserId(userToken)).thenReturn(userId)
+        whenever(jwtService.extractUsername(userToken)).thenReturn(userEmail)
         whenever(eventRepository.findById(100L)).thenReturn(Optional.of(event))
         whenever(ticketTierRepository.findById(50L)).thenReturn(Optional.of(tier))
 

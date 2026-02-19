@@ -3,9 +3,11 @@ package com.thehiveproject.event.unit
 import com.thehiveproject.event.api.dto.CreateEventRequest
 import com.thehiveproject.event.api.dto.CreateTicketTierRequest
 import com.thehiveproject.event.api.dto.UpdateEventRequest
+import com.thehiveproject.event.api.dto.UserSummaryDTO
 import com.thehiveproject.event.application.event.EventServiceImpl
 import com.thehiveproject.event.domain.event.EventStatus
 import com.thehiveproject.event.domain.event.error.UnauthorizedEventAccessException
+import com.thehiveproject.event.infrastructure.persistence.client.IdentityClient
 import com.thehiveproject.event.infrastructure.persistence.event.EventEntity
 import com.thehiveproject.event.infrastructure.persistence.event.EventRepository
 import com.thehiveproject.event.infrastructure.persistence.event.TicketTierEntity
@@ -36,12 +38,18 @@ class EventServiceUnitTest {
     @Mock
     lateinit var jwtService: JwtService
 
+    @Mock
+    lateinit var identityClient: IdentityClient
+
     @InjectMocks
     lateinit var eventService: EventServiceImpl
 
     private val organizerId = 1L
     private val organizerToken = "org-token"
     private val adminToken = "admin-token"
+
+    // Dummy User for Mocking
+    private val mockOrganizer = UserSummaryDTO(organizerId, "Test Organizer", "org@test.com")
 
     // Helper to create entity
     private fun createEventEntity(
@@ -107,6 +115,8 @@ class EventServiceUnitTest {
             (it.arguments[0] as EventEntity).apply { id = 100L }
         }
 
+        `when`(identityClient.getUsersById(organizerId)).thenReturn(mockOrganizer)
+
         val result = eventService.createEvent(request, organizerToken)
 
         assertNotNull(result.id)
@@ -132,6 +142,8 @@ class EventServiceUnitTest {
             eq("ROLE_ADMIN"),
             eq("ROLE_SUPER_ADMIN")
         )).thenReturn(false)
+
+        `when`(identityClient.getUsersById(organizerId)).thenReturn(mockOrganizer)
 
         val result = eventService.updateEvent(
             1L,
@@ -177,6 +189,8 @@ class EventServiceUnitTest {
             eq("ROLE_ADMIN"),
             eq("ROLE_SUPER_ADMIN")
         )).thenReturn(true)
+
+        `when`(identityClient.getUsersById(organizerId)).thenReturn(mockOrganizer)
 
         val result = eventService.updateEvent(
             1L,

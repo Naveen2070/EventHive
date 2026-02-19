@@ -5,7 +5,9 @@ import com.thehiveproject.event.TestcontainersConfiguration
 import com.thehiveproject.event.api.dto.CreateEventRequest
 import com.thehiveproject.event.api.dto.CreateTicketTierRequest
 import com.thehiveproject.event.api.dto.UpdateEventRequest
+import com.thehiveproject.event.api.dto.UserSummaryDTO
 import com.thehiveproject.event.domain.event.EventStatus
+import com.thehiveproject.event.infrastructure.persistence.client.IdentityClient
 import com.thehiveproject.event.infrastructure.persistence.event.EventEntity
 import com.thehiveproject.event.infrastructure.persistence.event.EventRepository
 import com.thehiveproject.event.infrastructure.persistence.event.TicketTierEntity
@@ -15,6 +17,8 @@ import io.jsonwebtoken.security.Keys
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.`when`
+import org.mockito.kotlin.any
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -23,6 +27,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
@@ -49,6 +54,10 @@ class EventControllerIntegrationTest {
     @Autowired
     lateinit var eventRepository: EventRepository
 
+    // Inject a MockBean to bypass real Feign HTTP calls during integration tests
+    @MockitoBean
+    lateinit var identityClient: IdentityClient
+
     @Value("\${jwt.secret}")
     private lateinit var jwtSecret: String
 
@@ -69,7 +78,12 @@ class EventControllerIntegrationTest {
         // 1. Clean DB
         eventRepository.deleteAll()
 
-        // 2. Generate Stateless Tokens (Simulating Identity Service)
+        // 2. Stub the Feign client responses so all integration test flows work
+        val mockUser = UserSummaryDTO(organizerId, "Test Organizer", "org@test.com")
+        `when`(identityClient.getUsersById(any())).thenReturn(mockUser)
+        `when`(identityClient.getUsersByIds(any())).thenReturn(listOf(mockUser))
+
+        // 3. Generate Stateless Tokens (Simulating Identity Service)
         organizerToken = generateTestToken(organizerId, "org@test.com", listOf("ROLE_ORGANIZER"))
         adminToken = generateTestToken(adminId, "admin@test.com", listOf("ROLE_ADMIN"))
         userToken = generateTestToken(userId, "user@test.com", listOf("ROLE_USER"))
@@ -82,8 +96,8 @@ class EventControllerIntegrationTest {
 
         return Jwts.builder()
             .subject(email)
-            .claim("id", id)      // Matching JwtService.extractUserId()
-            .claim("roles", roles) // Matching JwtService.extractRoles()
+            .claim("id", id)
+            .claim("roles", roles)
             .issuedAt(Date())
             .expiration(Date(System.currentTimeMillis() + 1000 * 60 * 60))
             .signWith(key)
