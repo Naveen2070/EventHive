@@ -15,7 +15,7 @@ Hive-Event is the central domain engine of the Hive platform. Operating within a
 ## 🚀 Key Features
 
 * **🎫 Multi-Tier Ticketing:** Support for complex event structures (e.g., "Early Bird", "VIP") with individual pricing, allocation, and validity windows.
-* **⚡ Concurrency-Safe Inventory:** Implements **Optimistic Locking** and `@Retryable` backoffs to prevent "Lost Update" problems and overselling during high-traffic ticket drops.
+* **⚡ Concurrency-Safe Inventory:** Implements **Optimistic Locking** and `@Retryable` backoff's to prevent "Lost Update" problems and overselling during high-traffic ticket drops.
 * **📱 Smart Check-In System:** QR-code ready endpoint handling **Date Validation** (e.g., checking a Friday pass on Saturday) and **Re-entry Logic** for multi-day events.
 * **🐇 Async Notifications (RabbitMQ):** Completely non-blocking notification architecture. Booking confirmations are published to the `hive.notifications` exchange.
 * **🛡️ Secure S2S Communication:** Uses Spring Cloud OpenFeign with custom interceptors to generate time-sensitive **HMAC-SHA256 signatures** for secure internal data fetching from the Identity Service.
@@ -50,9 +50,100 @@ src/main/kotlin/com/thehiveproject/event
 └── configuration       # Spring Configuration (Beans, Async, RabbitMQ)
 
 ```
+---
+Here is the updated section. I have added a prominent warning block right at the top, added `Hive-Identity` to the prerequisites, and gently corrected the syntax in your `.env` snippet (environment files use `=` instead of `:`).
+
+I also added a quick note in the Manual Run section to remind developers to spin up RabbitMQ alongside the database!
 
 ---
 
+## ⚙️ Getting Started (How to Run)
+
+> ⚠️ **IMPORTANT: Microservice Dependency**
+> Hive-Event is a dependent microservice. It relies entirely on the **[Hive-Identity](https://github.com/Naveen2070/Hive-Identity)** service for JWT authentication, user registration, and S2S user data hydration. To test the full application flow, you must have the Identity Service running simultaneously.
+
+The application is fully containerized using a multi-stage Dockerfile that builds a lightweight Alpine Linux image running JDK 21 under a secure, non-root `eventhive` user.
+
+### Prerequisites
+
+* **Java 21** (for manual runs)
+* **Docker & Docker Compose**
+* **Git**
+* **Hive-Identity Service** (running locally or via Docker)
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/Naveen2070/EventHive.git
+cd EventHive
+```
+
+### 2. Environment Variables (`.env`)
+
+Before running the application, create a `.env` file in the root directory. The `docker-compose.yml` expects these variables to configure the `prod` profile:
+
+```ini
+# Database
+DB_USERNAME=admin
+DB_PASSWORD=password
+
+# JWT Security (Must exactly match the Identity Service secret)
+JWT_SECRET=your_super_secret_jwt_key_here
+JWT_EXPIRATION_MS=86400000
+
+# RabbitMQ Config
+RABBITMQ_HOST=hive-rabbitmq
+RABBITMQ_PORT=5672
+RABBITMQ_USERNAME=guest
+RABBITMQ_PASSWORD=guest
+RABBITMQ_VHOST=/
+
+# Identity Service S2S Config (Must match Identity Service exactly)
+INTERNAL_SHARED_SECRET=your_super_secret_shared_key
+IDENTITY_SERVICE_URL=http://identity-service:8081
+```
+
+### 3. Run via Docker Compose (Recommended)
+
+This method spins up a PostgreSQL 17.7-alpine database and your application simultaneously. The application waits for the database health check to pass before starting.
+
+*(Note: In a full local testing setup, you would typically run a unified `docker-compose.yml` that includes the Identity Service, Core API, API Gateway, and RabbitMQ).*
+
+```bash
+# Build and start the containers in detached mode
+docker-compose up --build -d
+```
+
+* The API will be available at `http://localhost:8080`.
+* The PostgreSQL database is exposed on port `5432`.
+
+To view the logs:
+
+```bash
+docker-compose logs -f app
+```
+
+### 4. Run Manually (Local Development)
+
+If you prefer to run the Spring Boot application directly on your host machine for debugging:
+
+**Step A: Spin up the infrastructure (Database & RabbitMQ)**
+
+```bash
+docker run --name eventhive-db -e POSTGRES_USER=admin -e POSTGRES_PASSWORD=password -e POSTGRES_DB=eventhive -p 5432:5432 -d postgres:17.7-alpine
+docker run --name hive-rabbitmq -p 5672:5672 -p 15672:15672 -d rabbitmq:3-management
+```
+
+**Step B: Run the application via Gradle**
+Ensure your local `application-dev.properties` points to `localhost:5432` for Postgres, `localhost:5672` for RabbitMQ, and `localhost:8081` for the `IDENTITY_SERVICE_URL`. Then run:
+
+```bash
+./gradlew bootRun
+```
+
+*Liquibase will automatically migrate the schema on startup.*
+
+---
 ## 🔌 API Endpoints
 
 *(Note: All endpoints require a valid JWT issued by the `Hive-Identity` service).*
