@@ -35,8 +35,8 @@ jobs:
         run: ./gradlew test
 
 #      # 5. Build the WAR file
-#      - name: Build WAR with Gradle
-#        run: ./gradlew bootWar -x test
+      - name: Build WAR with Gradle
+        run: ./gradlew bootWar -x test
 #
 #      # 6. Upload the WAR file (Optional: Lets you download the built app from GitHub)
 #      - name: Upload WAR artifact
