@@ -16,7 +16,7 @@ RUN gradle bootWar -x test --no-daemon
 
 # --- Stage 2: Create the Runtime Image ---
 # Use a lightweight Alpine Linux with JRE 21
-FROM eclipse-temurin:21-jdk-alpine-3.23
+FROM eclipse-temurin:21-jre-noble
 WORKDIR /app
 
 # 4. Create a non-root user (Security Best Practice)
