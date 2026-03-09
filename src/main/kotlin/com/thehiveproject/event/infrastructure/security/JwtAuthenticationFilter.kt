@@ -19,6 +19,7 @@ class JwtAuthenticationFilter(
 ) : OncePerRequestFilter() {
 
     private val objectMapper = ObjectMapper()
+    private val log = LoggerFactory.getLogger(JwtAuthenticationFilter::class.java)
 
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -28,7 +29,6 @@ class JwtAuthenticationFilter(
 
         val authHeader = request.getHeader("Authorization")
 
-        // If no token or header doesn't start with "Bearer ", continue filter chain
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response)
             return
@@ -37,44 +37,71 @@ class JwtAuthenticationFilter(
         val token = authHeader.substring(7)
 
         try {
-            if (SecurityContextHolder.getContext().authentication == null && jwtService.isTokenValid(token)) {
-                // 1. Extract User Details from Token Claims
+            if (jwtService.isTokenValid(token)) {
                 val username = jwtService.extractUsername(token)
-                val roles = jwtService.extractRoles(token)
+                val permissions = jwtService.extractPermissions(token)
+                val legacyRoles = jwtService.extractRoles(token)
 
-                // 2. Convert Roles to Spring Security Authorities
-                val authorities = roles.map { SimpleGrantedAuthority(it) }
-
-                // 3. Create Authentication Object
-                    val authToken = UsernamePasswordAuthenticationToken(
-                        username,
-                        null,
-                        authorities
+                if (!permissions.containsKey("events")) {
+                    log.warn("JWT rejected: 'events' domain missing for user $username")
+                    sendErrorResponse(
+                        response,
+                        "Access Denied: Token is not valid for the events service.",
+                        HttpServletResponse.SC_FORBIDDEN
                     )
-                    authToken.details = WebAuthenticationDetailsSource().buildDetails(request)
-                    SecurityContextHolder.getContext().authentication = authToken
+                    return
+                }
+
+                // 1. Map legacy roles (e.g. ROLE_USER)
+                val legacyAuthorities = legacyRoles.map { role ->
+                    val finalRole = if (role.startsWith("ROLE_")) role else "ROLE_$role"
+                    SimpleGrantedAuthority(finalRole)
+                }
+
+                // 2. Map domain authorities (e.g. events:ROLE_USER)
+                val eventRoles = permissions["events"] ?: emptyList()
+                val domainAuthorities = eventRoles.map { role ->
+                    val finalRole = if (role.startsWith("ROLE_")) role else "ROLE_$role"
+                    SimpleGrantedAuthority("events:$finalRole")
+                }
+
+                val authorities = legacyAuthorities + domainAuthorities
+
+                val userId = jwtService.extractUserId(token)
+                val authToken = UsernamePasswordAuthenticationToken(
+                    username,
+                    userId,
+                    authorities
+                )
+                authToken.details = WebAuthenticationDetailsSource().buildDetails(request)
+
+                SecurityContextHolder.getContext().authentication = authToken
             }
 
         } catch (ex: ExpiredJwtException) {
-            val logger = LoggerFactory.getLogger(JwtAuthenticationFilter::class.java)
-            logger.warn("JWT token expired: ${ex.message}")
+            log.warn("JWT token expired: ${ex.message}")
             sendErrorResponse(response, "Token has expired")
             return
         } catch (ex: Exception) {
-            val logger = LoggerFactory.getLogger(JwtAuthenticationFilter::class.java)
-            logger.warn("JWT authentication failed: ${ex.message}")
+            log.warn("JWT authentication failed: ${ex.message}")
             sendErrorResponse(response, "Invalid token")
             return
         }
 
-        // Continue filter chain
         filterChain.doFilter(request, response)
     }
 
-    private fun sendErrorResponse(response: HttpServletResponse, message: String) {
-        response.status = HttpServletResponse.SC_UNAUTHORIZED
+    private fun sendErrorResponse(
+        response: HttpServletResponse,
+        message: String,
+        status: Int = HttpServletResponse.SC_UNAUTHORIZED
+    ) {
+        response.status = status
         response.contentType = "application/json"
-        val errorResponse = mapOf("error" to "Unauthorized", "message" to message)
-        response.writer.write(objectMapper.writeValueAsString(errorResponse))
+        val errorTitle = if (status == HttpServletResponse.SC_FORBIDDEN) "Forbidden" else "Unauthorized"
+        val errorResponse = mapOf("error" to errorTitle, "message" to message)
+        val writer = response.writer
+        writer.write(objectMapper.writeValueAsString(errorResponse))
+        writer.flush()
     }
 }

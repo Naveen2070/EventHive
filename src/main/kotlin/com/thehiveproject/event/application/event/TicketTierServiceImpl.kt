@@ -9,7 +9,7 @@ import com.thehiveproject.event.domain.event.error.InvalidTicketTierException
 import com.thehiveproject.event.domain.event.error.TicketTierNotFoundException
 import com.thehiveproject.event.domain.event.error.UnauthorizedEventAccessException
 import com.thehiveproject.event.infrastructure.persistence.event.*
-import com.thehiveproject.event.infrastructure.security.JwtService
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -17,20 +17,20 @@ import org.springframework.transaction.annotation.Transactional
 class TicketTierServiceImpl(
     private val ticketTierRepository: TicketTierRepository,
     private val eventRepository: EventRepository,
-    private val jwtService: JwtService
 ) : TicketTierService {
+
+    private val logger = LoggerFactory.getLogger(TicketTierServiceImpl::class.java)
 
     @Transactional
     override fun addTierToEvent(
         eventId: Long,
         request: CreateTicketTierRequest,
-        token: String
+        userId: Long
     ): TicketTier {
         val event = eventRepository.findById(eventId)
             .orElseThrow { EventNotFoundException("Event not found") }
 
-        val userId = jwtService.extractUserId(token)
-        val isAdmin = jwtService.hasAnyRole(token, "SUPER_ADMIN", "ADMIN")
+        val isAdmin = hasAdminRole()
         validateOwnership(event, userId, isAdmin)
 
         // 1. Validate Dates
@@ -64,13 +64,12 @@ class TicketTierServiceImpl(
     override fun updateTier(
         tierId: Long,
         request: UpdateTicketTierRequest,
-        token: String,
+        userId: Long,
     ): TicketTier {
         val tier = ticketTierRepository.findById(tierId)
             .orElseThrow { TicketTierNotFoundException("Ticket tier not found") }
 
-        val isAdmin = jwtService.hasAnyRole(token, "SUPER_ADMIN", "ADMIN")
-        val userId = jwtService.extractUserId(token)
+        val isAdmin = hasAdminRole()
         validateOwnership(tier.event, userId, isAdmin)
 
         // 1. Validate Updates
@@ -118,12 +117,11 @@ class TicketTierServiceImpl(
     }
 
     @Transactional
-    override fun deleteTier(tierId: Long, token: String) {
+    override fun deleteTier(tierId: Long, userId: Long) {
         val tier = ticketTierRepository.findById(tierId)
             .orElseThrow { TicketTierNotFoundException("Ticket tier not found") }
 
-        val userId = jwtService.extractUserId(token)
-        val isAdmin = jwtService.hasAnyRole(token, "SUPER_ADMIN", "ADMIN")
+        val isAdmin = hasAdminRole()
         validateOwnership(tier.event, userId, isAdmin)
 
         // 🛡️ CRITICAL: Do not delete if tickets sold
@@ -135,6 +133,13 @@ class TicketTierServiceImpl(
 
         // Hard Delete is safe because no bookings exist
         ticketTierRepository.delete(tier)
+    }
+
+    private fun hasAdminRole(): Boolean {
+        val authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().authentication
+        return authentication?.authorities?.any {
+            it.authority == "events:ROLE_ADMIN" || it.authority == "events:ROLE_SUPER_ADMIN"
+        } ?: false
     }
 
     private fun validateOwnership(event: EventEntity, userId: Long, isAdmin: Boolean) {

@@ -1,10 +1,6 @@
 package com.thehiveproject.event.application.event
 
-import com.thehiveproject.event.api.dto.CreateEventRequest
-import com.thehiveproject.event.api.dto.EventDTO
-import com.thehiveproject.event.api.dto.EventSearchCriteria
-import com.thehiveproject.event.api.dto.UpdateEventRequest
-import com.thehiveproject.event.api.dto.UserSummaryDTO
+import com.thehiveproject.event.api.dto.*
 import com.thehiveproject.event.api.mapper.toDTO
 import com.thehiveproject.event.domain.event.Event
 import com.thehiveproject.event.domain.event.EventService
@@ -15,7 +11,6 @@ import com.thehiveproject.event.domain.event.error.EventNotFoundException
 import com.thehiveproject.event.domain.event.error.UnauthorizedEventAccessException
 import com.thehiveproject.event.infrastructure.persistence.client.IdentityClient
 import com.thehiveproject.event.infrastructure.persistence.event.*
-import com.thehiveproject.event.infrastructure.security.JwtService
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -27,15 +22,12 @@ import java.time.ZoneId
 @Service
 class EventServiceImpl(
     private val eventRepository: EventRepository,
-    private val jwtService: JwtService,
     private val identityClient: IdentityClient
 ) : EventService {
     private val logger = LoggerFactory.getLogger(EventServiceImpl::class.java)
 
     @Transactional
-    override fun createEvent(request: CreateEventRequest, token: String): Event {
-        val userId = jwtService.extractUserId(token)
-
+    override fun createEvent(request: CreateEventRequest, userId: Long): Event {
         val eventEntity = EventEntity(
             title = request.title,
             description = request.description,
@@ -97,8 +89,7 @@ class EventServiceImpl(
     }
 
     @Transactional(readOnly = true)
-    override fun getMyEvents(pageable: Pageable, token: String): Page<EventDTO> {
-        val userId = jwtService.extractUserId(token)
+    override fun getMyEvents(pageable: Pageable, userId: Long): Page<EventDTO> {
         val eventsPage = eventRepository.findByOrganizerId(userId, pageable)
         val usersMap = fetchOrganizersMap(eventsPage.content)
 
@@ -114,10 +105,9 @@ class EventServiceImpl(
     override fun updateEvent(
         eventId: Long,
         request: UpdateEventRequest,
-        token: String
+        userId: Long
     ): EventDTO {
-        val userId = jwtService.extractUserId(token)
-        val isAdmin = jwtService.hasAnyRole(token, "ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+        val isAdmin = hasAdminRole()
 
         val event = eventRepository.findById(eventId)
             .orElseThrow { EventNotFoundException("Event not found") }
@@ -158,13 +148,12 @@ class EventServiceImpl(
     override fun changeEventStatus(
         eventId: Long,
         status: EventStatus,
-        token: String
+        userId: Long
     ): EventDTO {
         val event = eventRepository.findById(eventId)
             .orElseThrow { EventNotFoundException("Event not found") }
 
-        val userId = jwtService.extractUserId(token)
-        val isAdmin = jwtService.hasAnyRole(token, "ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+        val isAdmin = hasAdminRole()
         validateOwnership(event, userId, isAdmin)
 
         val hasSoldTickets = event.ticketTiers.any { it.totalAllocation != it.availableAllocation }
@@ -193,13 +182,11 @@ class EventServiceImpl(
     }
 
     @Transactional
-    override fun deleteEvent(eventId: Long, token: String) {
-        val userId = jwtService.extractUserId(token)
-
+    override fun deleteEvent(eventId: Long, userId: Long) {
         val event = eventRepository.findById(eventId)
             .orElseThrow { EventNotFoundException("Event not found") }
-        
-        val isAdmin = jwtService.hasAnyRole(token, "ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+
+        val isAdmin = hasAdminRole()
 
         validateOwnership(event, userId, isAdmin)
         assertEventNotLocked(event)
@@ -212,6 +199,13 @@ class EventServiceImpl(
             logger.error("Failed to delete event: ${e.message}")
             throw RuntimeException("Failed to delete event: ${e.message}")
         }
+    }
+
+    private fun hasAdminRole(): Boolean {
+        val authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().authentication
+        return authentication?.authorities?.any {
+            it.authority == "events:ROLE_ADMIN" || it.authority == "events:ROLE_SUPER_ADMIN"
+        } ?: false
     }
 
     private fun validateOwnership(event: EventEntity, userId: Long, isAdmin: Boolean) {

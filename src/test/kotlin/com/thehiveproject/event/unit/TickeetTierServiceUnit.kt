@@ -10,12 +10,18 @@ import com.thehiveproject.event.infrastructure.persistence.event.TicketTierEntit
 import com.thehiveproject.event.infrastructure.persistence.event.TicketTierRepository
 import com.thehiveproject.event.infrastructure.security.JwtService
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
-import org.mockito.kotlin.*
+import org.mockito.kotlin.any
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.authority.SimpleGrantedAuthority
+import org.springframework.security.core.context.SecurityContextHolder
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.*
@@ -37,8 +43,20 @@ class TicketTierServiceUnitTest {
 
     // --- Helpers ---
     private val organizerId = 1L
-    private val organizerToken = "org-token"
-    private val otherToken = "other-token"
+    private val adminId = 999L
+
+    @BeforeEach
+    fun clearSecurityContext() {
+        SecurityContextHolder.clearContext()
+    }
+
+    private fun setupMockUser(userId: Long, roles: List<String> = emptyList()) {
+        val authorities = roles.map { SimpleGrantedAuthority(it) }
+        val auth = UsernamePasswordAuthenticationToken("user@test.com", userId, authorities)
+        val context = SecurityContextHolder.createEmptyContext()
+        context.authentication = auth
+        SecurityContextHolder.setContext(context)
+    }
 
     private fun createEvent(
         startDate: LocalDateTime = LocalDateTime.now(),
@@ -60,6 +78,7 @@ class TicketTierServiceUnitTest {
 
     @Test
     fun `addTierToEvent should succeed when valid`() {
+        setupMockUser(organizerId, listOf("events:ROLE_ORGANIZER"))
         val event = createEvent()
         val request = CreateTicketTierRequest(
             name = "VIP",
@@ -75,11 +94,7 @@ class TicketTierServiceUnitTest {
             (it.arguments[0] as TicketTierEntity).apply { id = 55L }
         }
 
-        // Mock Auth
-        whenever(jwtService.extractUserId(organizerToken)).thenReturn(organizerId)
-        whenever(jwtService.hasAnyRole(eq(organizerToken), anyVararg())).thenReturn(false)
-
-        val result = ticketTierService.addTierToEvent(100L, request, organizerToken)
+        val result = ticketTierService.addTierToEvent(100L, request, organizerId)
 
         assertNotNull(result)
         assertEquals("VIP", result.name)
@@ -88,6 +103,7 @@ class TicketTierServiceUnitTest {
 
     @Test
     fun `addTierToEvent should fail if user is not organizer`() {
+        setupMockUser(999L, listOf("events:ROLE_ORGANIZER"))
         val event = createEvent()
         val request = CreateTicketTierRequest(
             name = "VIP", price = BigDecimal("100"), totalAllocation = 50,
@@ -96,12 +112,8 @@ class TicketTierServiceUnitTest {
 
         whenever(eventRepository.findById(100L)).thenReturn(Optional.of(event))
 
-        // Mock Hacker
-        whenever(jwtService.extractUserId(otherToken)).thenReturn(999L)
-        whenever(jwtService.hasAnyRole(eq(otherToken), anyVararg())).thenReturn(false)
-
         assertThrows(UnauthorizedEventAccessException::class.java) {
-            ticketTierService.addTierToEvent(100L, request, otherToken)
+            ticketTierService.addTierToEvent(100L, request, 999L)
         }
     }
 }

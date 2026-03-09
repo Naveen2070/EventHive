@@ -12,9 +12,8 @@ import com.thehiveproject.event.infrastructure.persistence.event.EventEntity
 import com.thehiveproject.event.infrastructure.persistence.event.EventRepository
 import com.thehiveproject.event.infrastructure.persistence.event.TicketTierEntity
 import com.thehiveproject.event.infrastructure.security.JwtService
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
@@ -23,8 +22,10 @@ import org.mockito.Mock
 import org.mockito.Mockito.`when`
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
-import org.mockito.kotlin.eq
 import org.mockito.kotlin.verify
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.authority.SimpleGrantedAuthority
+import org.springframework.security.core.context.SecurityContextHolder
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.*
@@ -45,11 +46,23 @@ class EventServiceUnitTest {
     lateinit var eventService: EventServiceImpl
 
     private val organizerId = 1L
-    private val organizerToken = "org-token"
-    private val adminToken = "admin-token"
+    private val adminId = 999L
 
     // Dummy User for Mocking
     private val mockOrganizer = UserSummaryDTO(organizerId, "Test Organizer", "org@test.com")
+
+    @BeforeEach
+    fun clearSecurityContext() {
+        SecurityContextHolder.clearContext()
+    }
+
+    private fun setupMockUser(userId: Long, roles: List<String> = emptyList()) {
+        val authorities = roles.map { SimpleGrantedAuthority(it) }
+        val auth = UsernamePasswordAuthenticationToken("user@test.com", userId, authorities)
+        val context = SecurityContextHolder.createEmptyContext()
+        context.authentication = auth
+        SecurityContextHolder.setContext(context)
+    }
 
     // Helper to create entity
     private fun createEventEntity(
@@ -110,14 +123,13 @@ class EventServiceUnitTest {
             createdBy = 1L
         )
 
-        `when`(jwtService.extractUserId(organizerToken)).thenReturn(organizerId)
         `when`(eventRepository.save(any<EventEntity>())).thenAnswer {
             (it.arguments[0] as EventEntity).apply { id = 100L }
         }
 
         `when`(identityClient.getUsersById(organizerId)).thenReturn(mockOrganizer)
 
-        val result = eventService.createEvent(request, organizerToken)
+        val result = eventService.createEvent(request, organizerId)
 
         assertNotNull(result.id)
         assertEquals("New Event", result.title)
@@ -131,24 +143,17 @@ class EventServiceUnitTest {
 
     @Test
     fun `organizer can update own event`() {
+        setupMockUser(organizerId, listOf("events:ROLE_ORGANIZER"))
         val event = createEventEntity()
         `when`(eventRepository.findById(1L)).thenReturn(Optional.of(event))
         `when`(eventRepository.save(event)).thenReturn(event)
-
-        `when`(jwtService.extractUserId(organizerToken)).thenReturn(organizerId)
-
-        `when`(jwtService.hasAnyRole(
-            eq(organizerToken),
-            eq("ROLE_ADMIN"),
-            eq("ROLE_SUPER_ADMIN")
-        )).thenReturn(false)
 
         `when`(identityClient.getUsersById(organizerId)).thenReturn(mockOrganizer)
 
         val result = eventService.updateEvent(
             1L,
             UpdateEventRequest("Updated", null, null, null, null),
-            organizerToken
+            organizerId
         )
 
         assertEquals("Updated", result.title)
@@ -156,46 +161,31 @@ class EventServiceUnitTest {
 
     @Test
     fun `non-owner cannot update event`() {
+        setupMockUser(999L, listOf("events:ROLE_ORGANIZER"))
         `when`(eventRepository.findById(1L)).thenReturn(Optional.of(createEventEntity()))
-
-        val hackerToken = "hacker"
-        `when`(jwtService.extractUserId(hackerToken)).thenReturn(999L)
-
-        `when`(jwtService.hasAnyRole(
-            eq(hackerToken),
-            eq("ROLE_ADMIN"),
-            eq("ROLE_SUPER_ADMIN")
-        )).thenReturn(false)
 
         assertThrows<UnauthorizedEventAccessException> {
             eventService.updateEvent(
                 1L,
                 UpdateEventRequest("Hack", null, null, null, null),
-                hackerToken
+                999L
             )
         }
     }
 
     @Test
     fun `admin can update any event`() {
+        setupMockUser(adminId, listOf("events:ROLE_ADMIN"))
         val event = createEventEntity()
         `when`(eventRepository.findById(1L)).thenReturn(Optional.of(event))
         `when`(eventRepository.save(event)).thenReturn(event)
-
-        `when`(jwtService.extractUserId(adminToken)).thenReturn(999L)
-
-        `when`(jwtService.hasAnyRole(
-            eq(adminToken),
-            eq("ROLE_ADMIN"),
-            eq("ROLE_SUPER_ADMIN")
-        )).thenReturn(true)
 
         `when`(identityClient.getUsersById(organizerId)).thenReturn(mockOrganizer)
 
         val result = eventService.updateEvent(
             1L,
             UpdateEventRequest("Admin Edit", null, null, null, null),
-            adminToken
+            adminId
         )
 
         assertEquals("Admin Edit", result.title)
@@ -207,19 +197,12 @@ class EventServiceUnitTest {
 
     @Test
     fun `organizer can delete unlocked event`() {
+        setupMockUser(organizerId, listOf("events:ROLE_ORGANIZER"))
         val event = createEventEntity(status = EventStatus.DRAFT)
         `when`(eventRepository.findById(1L)).thenReturn(Optional.of(event))
         `when`(eventRepository.save(event)).thenReturn(event)
 
-        `when`(jwtService.extractUserId(organizerToken)).thenReturn(organizerId)
-
-        `when`(jwtService.hasAnyRole(
-            eq(organizerToken),
-            eq("ROLE_ADMIN"),
-            eq("ROLE_SUPER_ADMIN")
-        )).thenReturn(false)
-
-        eventService.deleteEvent(1L, organizerToken)
+        eventService.deleteEvent(1L, organizerId)
 
         assertTrue(event.isDeleted)
         verify(eventRepository).save(event)

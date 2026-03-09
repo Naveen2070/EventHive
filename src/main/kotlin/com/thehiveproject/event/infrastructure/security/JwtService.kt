@@ -68,20 +68,52 @@ class JwtService(
 
     fun extractRoles(token: String): List<String> {
         val claims = extractAllClaims(token)
+        return when (val rawRoles = claims["roles"]) {
+            is List<*> -> rawRoles.map { it.toString() }
+            is String -> listOf(rawRoles)
+            else -> emptyList()
+        }
+    }
 
-        return claims
-            .get("roles", List::class.java)
-            ?.map { it.toString() }
-            ?: emptyList()
+    fun extractPermissions(token: String): Map<String, List<String>> {
+        val claims = extractAllClaims(token)
+        val rawPermissions = claims["permissions"] as? Map<*, *> ?: return emptyMap()
+
+        val result = mutableMapOf<String, List<String>>()
+        rawPermissions.forEach { (key, value) ->
+            if (key is String) {
+                val roles = when (value) {
+                    is List<*> -> value.map { it.toString() }
+                    is String -> listOf(value)
+                    else -> emptyList()
+                }
+                result[key] = roles
+            }
+        }
+        return result
     }
 
     fun hasAnyRole(token: String, vararg requiredRoles: String): Boolean {
-        val roles = extractAllClaims(token)
-            .get("roles", List::class.java)
-            ?.map { it.toString() }
-            ?: return false
+        val claims = extractAllClaims(token)
 
-        return roles.any { it in requiredRoles }
+        // Normalize required roles with ROLE_ prefix
+        val normalizedRequired = requiredRoles.map { if (it.startsWith("ROLE_")) it else "ROLE_$it" }
+
+        // 1. Check legacy 'roles' claim
+        val legacyRoles = when (val rawRoles = claims["roles"]) {
+            is List<*> -> rawRoles.map { it.toString() }
+            is String -> listOf(rawRoles)
+            else -> emptyList()
+        }
+        val normalizedLegacy = legacyRoles.map { if (it.startsWith("ROLE_")) it else "ROLE_$it" }
+        if (normalizedLegacy.any { it in normalizedRequired }) return true
+
+        // 2. Check 'permissions' map for 'events' domain
+        val permissions = extractPermissions(token)
+        val eventRoles = permissions["events"] ?: emptyList()
+        val normalizedEventRoles = eventRoles.map { if (it.startsWith("ROLE_")) it else "ROLE_$it" }
+
+        return normalizedEventRoles.any { it in normalizedRequired }
     }
 
 

@@ -4,7 +4,6 @@ import com.thehiveproject.event.api.dto.CreateTicketTierRequest
 import com.thehiveproject.event.api.dto.TicketTierDTO
 import com.thehiveproject.event.api.dto.UpdateTicketTierRequest
 import com.thehiveproject.event.api.mapper.toDTO
-import com.thehiveproject.event.api.utils.extractToken
 import com.thehiveproject.event.domain.event.TicketTierService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
@@ -14,7 +13,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
-import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
@@ -29,7 +27,7 @@ class TicketTierController(
 ) {
 
     @PostMapping("/events/{eventId}")
-    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('events:ROLE_ORGANIZER') or hasAuthority('events:ROLE_ADMIN') or hasAuthority('events:ROLE_SUPER_ADMIN')")
     @Operation(
         summary = "Add ticket tier to event",
         description = "Creates a new ticket tier for an event. Only the organizer or admins can perform this action."
@@ -45,16 +43,15 @@ class TicketTierController(
     fun addTierToEvent(
         @PathVariable eventId: Long,
         @Valid @RequestBody request: CreateTicketTierRequest,
-        @RequestHeader(HttpHeaders .AUTHORIZATION) authHeader: String
     ): ResponseEntity<TicketTierDTO> {
-        val token = extractToken(authHeader)
+        val userId = com.thehiveproject.event.infrastructure.security.SecurityUtils.getCurrentUserId()
 
-        val createdTier = ticketTierService.addTierToEvent(eventId, request, token)
+        val createdTier = ticketTierService.addTierToEvent(eventId, request, userId)
         return ResponseEntity.status(HttpStatus.CREATED).body(createdTier.toDTO())
     }
 
     @PutMapping("/{tierId}")
-    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('events:ROLE_ORGANIZER') or hasAuthority('events:ROLE_ADMIN') or hasAuthority('events:ROLE_SUPER_ADMIN')")
     @Operation(
         summary = "Update ticket tier",
         description = "Updates an existing ticket tier. Only the organizer or admins can update a tier."
@@ -69,17 +66,16 @@ class TicketTierController(
     )
     fun updateTier(
         @PathVariable tierId: Long,
-        @Valid @RequestBody request: UpdateTicketTierRequest,
-@RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String
+        @Valid @RequestBody request: UpdateTicketTierRequest
     ): ResponseEntity<TicketTierDTO> {
-        val token = extractToken(authHeader)
+        val userId = com.thehiveproject.event.infrastructure.security.SecurityUtils.getCurrentUserId()
 
-        val updatedTier = ticketTierService.updateTier(tierId, request, token)
+        val updatedTier = ticketTierService.updateTier(tierId, request, userId)
         return ResponseEntity.ok(updatedTier.toDTO())
     }
 
     @DeleteMapping("/{tierId}")
-    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('events:ROLE_ORGANIZER') or hasAuthority('events:ROLE_ADMIN') or hasAuthority('events:ROLE_SUPER_ADMIN')")
     @Operation(
         summary = "Delete ticket tier",
         description = "Deletes a ticket tier if no tickets have been sold."
@@ -93,12 +89,11 @@ class TicketTierController(
         ]
     )
     fun deleteTier(
-        @PathVariable tierId: Long,
-@RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String
+        @PathVariable tierId: Long
     ): ResponseEntity<Void> {
-        val token = extractToken(authHeader)
+        val userId = com.thehiveproject.event.infrastructure.security.SecurityUtils.getCurrentUserId()
 
-        ticketTierService.deleteTier(tierId, token)
+        ticketTierService.deleteTier(tierId, userId)
         return ResponseEntity.noContent().build()
     }
 
