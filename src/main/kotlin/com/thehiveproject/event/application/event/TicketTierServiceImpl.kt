@@ -9,6 +9,7 @@ import com.thehiveproject.event.domain.event.error.InvalidTicketTierException
 import com.thehiveproject.event.domain.event.error.TicketTierNotFoundException
 import com.thehiveproject.event.domain.event.error.UnauthorizedEventAccessException
 import com.thehiveproject.event.infrastructure.persistence.event.*
+import com.thehiveproject.event.infrastructure.security.SecurityUtils
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -30,7 +31,7 @@ class TicketTierServiceImpl(
         val event = eventRepository.findById(eventId)
             .orElseThrow { EventNotFoundException("Event not found") }
 
-        val isAdmin = hasAdminRole()
+        val isAdmin = SecurityUtils.hasAnyAuthority("events:ROLE_ADMIN", "events:ROLE_SUPER_ADMIN")
         validateOwnership(event, userId, isAdmin)
 
         // 1. Validate Dates
@@ -69,7 +70,7 @@ class TicketTierServiceImpl(
         val tier = ticketTierRepository.findById(tierId)
             .orElseThrow { TicketTierNotFoundException("Ticket tier not found") }
 
-        val isAdmin = hasAdminRole()
+        val isAdmin = SecurityUtils.hasAnyAuthority("events:ROLE_ADMIN", "events:ROLE_SUPER_ADMIN")
         validateOwnership(tier.event, userId, isAdmin)
 
         // 1. Validate Updates
@@ -121,7 +122,7 @@ class TicketTierServiceImpl(
         val tier = ticketTierRepository.findById(tierId)
             .orElseThrow { TicketTierNotFoundException("Ticket tier not found") }
 
-        val isAdmin = hasAdminRole()
+        val isAdmin = SecurityUtils.hasAnyAuthority("events:ROLE_ADMIN", "events:ROLE_SUPER_ADMIN")
         validateOwnership(tier.event, userId, isAdmin)
 
         // 🛡️ CRITICAL: Do not delete if tickets sold
@@ -133,13 +134,6 @@ class TicketTierServiceImpl(
 
         // Hard Delete is safe because no bookings exist
         ticketTierRepository.delete(tier)
-    }
-
-    private fun hasAdminRole(): Boolean {
-        val authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().authentication
-        return authentication?.authorities?.any {
-            it.authority == "events:ROLE_ADMIN" || it.authority == "events:ROLE_SUPER_ADMIN"
-        } ?: false
     }
 
     private fun validateOwnership(event: EventEntity, userId: Long, isAdmin: Boolean) {

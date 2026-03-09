@@ -11,6 +11,7 @@ import com.thehiveproject.event.domain.event.error.EventNotFoundException
 import com.thehiveproject.event.domain.event.error.UnauthorizedEventAccessException
 import com.thehiveproject.event.infrastructure.persistence.client.IdentityClient
 import com.thehiveproject.event.infrastructure.persistence.event.*
+import com.thehiveproject.event.infrastructure.security.SecurityUtils
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -107,7 +108,7 @@ class EventServiceImpl(
         request: UpdateEventRequest,
         userId: Long
     ): EventDTO {
-        val isAdmin = hasAdminRole()
+        val isAdmin = SecurityUtils.hasAnyAuthority("events:ROLE_ADMIN", "events:ROLE_SUPER_ADMIN")
 
         val event = eventRepository.findById(eventId)
             .orElseThrow { EventNotFoundException("Event not found") }
@@ -153,7 +154,7 @@ class EventServiceImpl(
         val event = eventRepository.findById(eventId)
             .orElseThrow { EventNotFoundException("Event not found") }
 
-        val isAdmin = hasAdminRole()
+        val isAdmin = SecurityUtils.hasAnyAuthority("events:ROLE_ADMIN", "events:ROLE_SUPER_ADMIN")
         validateOwnership(event, userId, isAdmin)
 
         val hasSoldTickets = event.ticketTiers.any { it.totalAllocation != it.availableAllocation }
@@ -186,7 +187,7 @@ class EventServiceImpl(
         val event = eventRepository.findById(eventId)
             .orElseThrow { EventNotFoundException("Event not found") }
 
-        val isAdmin = hasAdminRole()
+        val isAdmin = SecurityUtils.hasAnyAuthority("events:ROLE_ADMIN", "events:ROLE_SUPER_ADMIN")
 
         validateOwnership(event, userId, isAdmin)
         assertEventNotLocked(event)
@@ -199,13 +200,6 @@ class EventServiceImpl(
             logger.error("Failed to delete event: ${e.message}")
             throw RuntimeException("Failed to delete event: ${e.message}")
         }
-    }
-
-    private fun hasAdminRole(): Boolean {
-        val authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().authentication
-        return authentication?.authorities?.any {
-            it.authority == "events:ROLE_ADMIN" || it.authority == "events:ROLE_SUPER_ADMIN"
-        } ?: false
     }
 
     private fun validateOwnership(event: EventEntity, userId: Long, isAdmin: Boolean) {

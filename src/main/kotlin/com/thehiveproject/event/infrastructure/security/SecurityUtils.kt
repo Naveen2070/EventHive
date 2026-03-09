@@ -23,4 +23,16 @@ object SecurityUtils {
         return authentication.credentials as? Long
             ?: throw IllegalStateException("User ID not found in authentication credentials")
     }
+
+    /**
+     * Checks if the current authenticated user has any of the specified authorities.
+     *
+     * @param authorities Variable number of authority strings to check for.
+     * @return true if the user has at least one of the specified authorities, false otherwise.
+     */
+    fun hasAnyAuthority(vararg authorities: String): Boolean {
+        val authentication = SecurityContextHolder.getContext().authentication ?: return false
+        val userAuthorities = authentication.authorities.map { it.authority }
+        return authorities.any { it in userAuthorities }
+    }
 }

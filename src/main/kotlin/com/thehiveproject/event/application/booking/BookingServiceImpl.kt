@@ -19,6 +19,7 @@ import com.thehiveproject.event.infrastructure.persistence.client.IdentityClient
 import com.thehiveproject.event.infrastructure.persistence.event.EventRepository
 import com.thehiveproject.event.infrastructure.persistence.event.TicketTierRepository
 import com.thehiveproject.event.infrastructure.persistence.event.toDomain
+import com.thehiveproject.event.infrastructure.security.SecurityUtils
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.dao.OptimisticLockingFailureException
@@ -151,7 +152,7 @@ class BookingServiceImpl(
     ): BookingDTO {
         val booking = bookingRepository.findById(bookingId)
             .orElseThrow { BookingNotFoundException("Booking not found") }
-        val isAdmin = hasAdminRole()
+        val isAdmin = SecurityUtils.hasAnyAuthority("events:ROLE_ADMIN", "events:ROLE_SUPER_ADMIN")
 
         // 1. Security Check
         if (!isAdmin) {
@@ -310,13 +311,6 @@ class BookingServiceImpl(
             attendeeName = userEmail,
             ticketTierName = tier.name
         )
-    }
-
-    private fun hasAdminRole(): Boolean {
-        val authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().authentication
-        return authentication?.authorities?.any {
-            it.authority == "events:ROLE_ADMIN" || it.authority == "events:ROLE_SUPER_ADMIN"
-        } ?: false
     }
 
 }
