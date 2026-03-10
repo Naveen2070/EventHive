@@ -7,10 +7,10 @@ interface TicketTierService {
     fun addTierToEvent(
         eventId: Long,
         request: CreateTicketTierRequest,
-        token: String
+        userId: Long
     ): TicketTier
 
-    fun updateTier(tierId: Long, request: UpdateTicketTierRequest, token: String): TicketTier
-    fun deleteTier(tierId: Long, token: String)
+    fun updateTier(tierId: Long, request: UpdateTicketTierRequest, userId: Long): TicketTier
+    fun deleteTier(tierId: Long, userId: Long)
     fun getTierById(tierId: Long): TicketTier
 }

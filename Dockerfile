@@ -16,16 +16,14 @@ RUN gradle bootWar -x test --no-daemon
 
 # --- Stage 2: Create the Runtime Image ---
 # Use a lightweight Alpine Linux with JRE 21
-FROM eclipse-temurin:21-jdk-alpine-3.23
+FROM eclipse-temurin:21-jre-noble
 WORKDIR /app
 
-# 4. Create a non-root user (Security Best Practice)
-# Running as root is a security risk; this creates a user named 'eventhive'
-RUN addgroup -S eventhive && adduser -S eventhive -G eventhive
+# 4. Create a non-root user (Ubuntu/Debian syntax)
+RUN groupadd -r eventhive && useradd -r -g eventhive eventhive
 USER eventhive:eventhive
 
 # 5. Copy the built WAR from the 'builder' stage
-# We rename it to 'app.war' so the ENTRYPOINT is simple
 COPY --from=builder /app/build/libs/*.war app.war
 
 # 6. Configuration

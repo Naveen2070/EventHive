@@ -8,7 +8,6 @@ import com.thehiveproject.event.infrastructure.persistence.booking.BookingReposi
 import com.thehiveproject.event.infrastructure.persistence.booking.projection.RecentSaleProjection
 import com.thehiveproject.event.infrastructure.persistence.booking.projection.RevenueTrendProjection
 import com.thehiveproject.event.infrastructure.persistence.event.EventRepository
-import com.thehiveproject.event.infrastructure.security.JwtService
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -20,14 +19,10 @@ import java.time.ZoneId
 class DashboardServiceImpl(
     private val bookingRepository: BookingRepository,
     private val eventRepository: EventRepository,
-    private val jwtService: JwtService
 ) : DashboardService {
 
     @Transactional
-    override fun getOrganizerStats(token: String): DashboardStatsDTO {
-
-        val userId = jwtService.extractUserId(token)
-
+    override fun getOrganizerStats(userId: Long): DashboardStatsDTO {
 
         val totalEvents = eventRepository.countByOrganizerId(userId)
         val activeEvents = eventRepository.countByOrganizerIdAndEndDateAfter(

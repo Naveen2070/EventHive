@@ -19,7 +19,7 @@ import com.thehiveproject.event.infrastructure.persistence.client.IdentityClient
 import com.thehiveproject.event.infrastructure.persistence.event.EventRepository
 import com.thehiveproject.event.infrastructure.persistence.event.TicketTierRepository
 import com.thehiveproject.event.infrastructure.persistence.event.toDomain
-import com.thehiveproject.event.infrastructure.security.JwtService
+import com.thehiveproject.event.infrastructure.security.SecurityUtils
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.dao.OptimisticLockingFailureException
@@ -41,7 +41,6 @@ class BookingServiceImpl(
     private val ticketTierRepository: TicketTierRepository,
     private val eventPublisher: ApplicationEventPublisher,
     private val identityClient: IdentityClient,
-    private val jwtService: JwtService
 ) : BookingService {
 
     private val logger = LoggerFactory.getLogger(BookingServiceImpl::class.java)
@@ -52,13 +51,11 @@ class BookingServiceImpl(
         maxAttempts = 3,
         backoff = Backoff(delay = 50)
     )
-    override fun createBooking(request: CreateBookingRequest, token: String): Booking {
+    override fun createBooking(request: CreateBookingRequest, userId: Long): Booking {
         logger.info("Attempting to book tickets for event ID: ${request.eventId}")
 
-
-        // 1. Fetch User
-        val userId = jwtService.extractUserId(token)
-        val userEmail = jwtService.extractUsername(token)
+        // 1. Get User Email from SecurityContext
+        val userEmail = org.springframework.security.core.context.SecurityContextHolder.getContext().authentication.name
 
         // 2. Fetch Event (Fresh copy on every retry attempt)
         val eventEntity = eventRepository.findById(request.eventId)
@@ -137,10 +134,7 @@ class BookingServiceImpl(
     }
 
     @Transactional(readOnly = true)
-    override fun getMyBookings(token: String, pageable: Pageable): Page<BookingDTO> {
-        // 1. Get the User ID from the email
-        val userId = jwtService.extractUserId(token)
-
+    override fun getMyBookings(userId: Long, pageable: Pageable): Page<BookingDTO> {
         // 2. Fetch Bookings from Repository
         val bookingsPage = bookingRepository.findByUserId(userId, pageable)
 
@@ -154,16 +148,16 @@ class BookingServiceImpl(
     override fun updateBookingStatus(
         bookingId: Long,
         newStatus: BookingStatus,
-        token: String
+        userId: Long
     ): BookingDTO {
         val booking = bookingRepository.findById(bookingId)
             .orElseThrow { BookingNotFoundException("Booking not found") }
-        val isAdmin = jwtService.hasAnyRole(token, "ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+        val isAdmin = SecurityUtils.hasAnyAuthority("events:ROLE_ADMIN", "events:ROLE_SUPER_ADMIN")
 
         // 1. Security Check
         if (!isAdmin) {
             // Regular users can ONLY Cancel their own bookings
-            if (booking.userId != jwtService.extractUserId(token)) {
+            if (booking.userId != userId) {
                 throw ResourceAccessDeniedException("You can only modify your own bookings.")
             }
             if (newStatus != BookingStatus.CANCELLED) {
@@ -231,12 +225,11 @@ class BookingServiceImpl(
     }
 
     @Transactional
-    override fun checkInAttendee(request: CheckInRequest, token: String): CheckInResponse {
+    override fun checkInAttendee(request: CheckInRequest, userId: Long): CheckInResponse {
         val booking = bookingRepository.findByBookingReference(request.bookingReference)
             ?: throw BookingNotFoundException("Invalid Ticket Reference")
 
-        val userId = jwtService.extractUserId(token)
-        val userEmail = jwtService.extractUsername(token)
+        val userEmail = org.springframework.security.core.context.SecurityContextHolder.getContext().authentication.name
 
         // 1. Ownership Check (Organizer Only)
         // We check if the logged-in user (userEmail) owns the event

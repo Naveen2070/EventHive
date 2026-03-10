@@ -2,7 +2,6 @@ package com.thehiveproject.event.api.controller
 
 import com.thehiveproject.event.api.dto.*
 import com.thehiveproject.event.api.mapper.toDTO
-import com.thehiveproject.event.api.utils.extractToken
 import com.thehiveproject.event.domain.booking.BookingService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -15,7 +14,6 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
-import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
@@ -55,10 +53,9 @@ class BookingController(
         @RequestBody
         @Parameter(description = "Booking creation request", required = true)
         request: CreateBookingRequest,
-        @RequestHeader(HttpHeaders .AUTHORIZATION) authHeader: String
     ): ResponseEntity<BookingDTO> {
-        val token = extractToken(authHeader)
-        val response = bookingService.createBooking(request, token)
+        val userId = com.thehiveproject.event.infrastructure.security.SecurityUtils.getCurrentUserId()
+        val response = bookingService.createBooking(request, userId)
         val responseDTO = response.toDTO()
         return ResponseEntity(responseDTO, HttpStatus.CREATED)
     }
@@ -80,13 +77,12 @@ class BookingController(
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     fun getMyBookings(
-        @RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String,
         @Parameter(description = "Pagination information")
         @PageableDefault(size = 10, sort = ["createdAt"])
         pageable: Pageable
     ): ResponseEntity<PaginatedResponse<BookingDTO>> {
-        val token = extractToken(authHeader)
-        val bookings = bookingService.getMyBookings(token, pageable)
+        val userId = com.thehiveproject.event.infrastructure.security.SecurityUtils.getCurrentUserId()
+        val bookings = bookingService.getMyBookings(userId, pageable)
         return ResponseEntity.ok(bookings.toPaginatedResponse())
     }
 
@@ -119,16 +115,15 @@ class BookingController(
         @Valid
         @RequestBody
         @Parameter(description = "Booking status update request", required = true)
-        request: UpdateBookingStatusRequest,
-        @RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String
+        request: UpdateBookingStatusRequest
     ): ResponseEntity<BookingDTO> {
-        val token = extractToken(authHeader)
+        val userId = com.thehiveproject.event.infrastructure.security.SecurityUtils.getCurrentUserId()
 
 
         val response = bookingService.updateBookingStatus(
             id,
             request.status,
-            token,
+            userId,
         )
 
         return ResponseEntity.ok(response)
@@ -161,7 +156,7 @@ class BookingController(
 
 
     @PostMapping("/check-in")
-    @PreAuthorize("hasRole('ORGANIZER')")
+    @PreAuthorize("hasAuthority('events:ROLE_ORGANIZER')")
     @Operation(
         summary = "Check in an attendee",
         description = "Validates a booking reference and marks the ticket as checked in. Only event organizers can perform this action.",
@@ -197,11 +192,10 @@ class BookingController(
         ]
     )
     fun checkInAttendee(
-        @RequestBody request: CheckInRequest,
-        @RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String
+        @RequestBody request: CheckInRequest
     ): ResponseEntity<CheckInResponse> {
-        val token = extractToken(authHeader)
-        val res = bookingService.checkInAttendee(request, token)
+        val userId = com.thehiveproject.event.infrastructure.security.SecurityUtils.getCurrentUserId()
+        val res = bookingService.checkInAttendee(request, userId)
         return ResponseEntity.ok(
             res.toSanitized()
         )

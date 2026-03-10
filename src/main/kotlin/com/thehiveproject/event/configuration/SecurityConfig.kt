@@ -50,7 +50,7 @@ class SecurityConfig(
                     .requestMatchers(HttpMethod.GET, "/api/events/**").permitAll()
 
                     // ------------------------------- RESTRICTED endpoints -------------------------------
-                    .requestMatchers("/api/admin/**").hasAnyRole("SUPER_ADMIN", "ADMIN")
+                    .requestMatchers("/api/admin/**").hasAnyAuthority("events:ROLE_SUPER_ADMIN", "events:ROLE_ADMIN")
 
                     // Explicitly requiring authentication at the security filter level for
                     // write operations on /api/events/** (POST/PUT/DELETE/PATCH).

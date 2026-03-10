@@ -2,7 +2,6 @@ package com.thehiveproject.event.api.controller
 
 import com.thehiveproject.event.api.dto.*
 import com.thehiveproject.event.api.mapper.toDTO
-import com.thehiveproject.event.api.utils.extractToken
 import com.thehiveproject.event.domain.event.EventService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -14,7 +13,6 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
-import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
@@ -50,14 +48,13 @@ class EventController(
         ]
     )
     @PostMapping
-    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('events:ROLE_ORGANIZER') or hasAuthority('events:ROLE_ADMIN') or hasAuthority('events:ROLE_SUPER_ADMIN')")
     fun createEvent(
-        @RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String,
         @Parameter(description = "Event creation request payload", required = true)
         @Valid @RequestBody request: CreateEventRequest,
     ): ResponseEntity<EventDTO> {
-        val token = extractToken(authHeader)
-        val response = eventService.createEvent(request,token)
+        val userId = com.thehiveproject.event.infrastructure.security.SecurityUtils.getCurrentUserId()
+        val response = eventService.createEvent(request, userId)
         val responseDTO = response.toDTO()
         return ResponseEntity(responseDTO, HttpStatus.CREATED)
     }
@@ -157,15 +154,14 @@ class EventController(
         ]
     )
     @GetMapping("/organizer")
-    @PreAuthorize("hasRole('ORGANIZER')")
+    @PreAuthorize("hasAuthority('events:ROLE_ORGANIZER')")
     fun getMyEvents(
         @Parameter(description = "Pagination information")
         @PageableDefault(size = 10, sort = ["createdAt"])
-        @RequestHeader(HttpHeaders .AUTHORIZATION) authHeader: String,
         pageable: Pageable
     ): ResponseEntity<PaginatedResponse<EventDTO>> {
-        val token = extractToken(authHeader)
-        val events = eventService.getMyEvents(pageable,token)
+        val userId = com.thehiveproject.event.infrastructure.security.SecurityUtils.getCurrentUserId()
+        val events = eventService.getMyEvents(pageable, userId)
         return ResponseEntity.ok(events.toPaginatedResponse())
     }
 
@@ -191,19 +187,17 @@ class EventController(
         ]
     )
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('events:ROLE_ORGANIZER') or hasAuthority('events:ROLE_ADMIN') or hasAuthority('events:ROLE_SUPER_ADMIN')")
     fun updateEvent(
         @Parameter(description = "Event ID", required = true)
         @PathVariable id: Long,
         @Valid
         @RequestBody
         @Parameter(description = "Event update request payload", required = true)
-        request: UpdateEventRequest,
-        @RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String
+        request: UpdateEventRequest
     ): ResponseEntity<EventDTO> {
-       val token = extractToken(authHeader)
-
-        val response = eventService.updateEvent(id, request, token)
+        val userId = com.thehiveproject.event.infrastructure.security.SecurityUtils.getCurrentUserId()
+        val response = eventService.updateEvent(id, request, userId)
         return ResponseEntity.ok(response)
     }
 
@@ -227,22 +221,20 @@ class EventController(
         ]
     )
     @PatchMapping("/status/{id}")
-    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('events:ROLE_ORGANIZER') or hasAuthority('events:ROLE_ADMIN') or hasAuthority('events:ROLE_SUPER_ADMIN')")
     fun changeStatus(
         @Parameter(description = "Event ID", required = true)
         @PathVariable id: Long,
         @Valid
         @RequestBody
         @Parameter(description = "Event status change request", required = true)
-        request: ChangeEventStatusRequest,
-        @RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String
+        request: ChangeEventStatusRequest
     ): ResponseEntity<EventDTO> {
-       val token = extractToken(authHeader)
-
+        val userId = com.thehiveproject.event.infrastructure.security.SecurityUtils.getCurrentUserId()
         val response = eventService.changeEventStatus(
             id,
             request.status,
-            token
+            userId
         )
         return ResponseEntity.ok(response)
     }
@@ -260,14 +252,13 @@ class EventController(
         ]
     )
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('events:ROLE_ORGANIZER') or hasAuthority('events:ROLE_ADMIN') or hasAuthority('events:ROLE_SUPER_ADMIN')")
     fun deleteEvent(
         @Parameter(description = "Event ID", required = true)
-        @PathVariable id: Long,
-        @RequestHeader(HttpHeaders.AUTHORIZATION) authHeader: String
+        @PathVariable id: Long
     ): ResponseEntity<Void> {
-        val token = extractToken(authHeader)
-        eventService.deleteEvent(id,token)
+        val userId = com.thehiveproject.event.infrastructure.security.SecurityUtils.getCurrentUserId()
+        eventService.deleteEvent(id, userId)
         return ResponseEntity.noContent().build()
     }
 }

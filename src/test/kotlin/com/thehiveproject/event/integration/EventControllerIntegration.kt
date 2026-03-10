@@ -28,11 +28,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
-import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.delete
-import org.springframework.test.web.servlet.get
-import org.springframework.test.web.servlet.post
-import org.springframework.test.web.servlet.put
+import org.springframework.test.web.servlet.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.*
@@ -84,20 +80,25 @@ class EventControllerIntegrationTest {
         `when`(identityClient.getUsersByIds(any())).thenReturn(listOf(mockUser))
 
         // 3. Generate Stateless Tokens (Simulating Identity Service)
-        organizerToken = generateTestToken(organizerId, "org@test.com", listOf("ROLE_ORGANIZER"))
-        adminToken = generateTestToken(adminId, "admin@test.com", listOf("ROLE_ADMIN"))
-        userToken = generateTestToken(userId, "user@test.com", listOf("ROLE_USER"))
-        otherOrganizerToken = generateTestToken(otherOrganizerId, "other@test.com", listOf("ROLE_ORGANIZER"))
+        organizerToken = generateTestToken(organizerId, "org@test.com", mapOf("events" to listOf("ORGANIZER")))
+        adminToken = generateTestToken(adminId, "admin@test.com", mapOf("events" to listOf("ADMIN")))
+        userToken = generateTestToken(userId, "user@test.com", mapOf("events" to listOf("USER")))
+        otherOrganizerToken =
+            generateTestToken(otherOrganizerId, "other@test.com", mapOf("events" to listOf("ORGANIZER")))
     }
 
-    private fun generateTestToken(id: Long, email: String, roles: List<String>): String {
+    private fun generateTestToken(id: Long, email: String, permissions: Map<String, List<String>>): String {
         val keyBytes = Decoders.BASE64.decode(jwtSecret)
         val key: SecretKey = Keys.hmacShaKeyFor(keyBytes)
+
+        // Extract flattened roles for legacy 'roles' claim
+        val roles = permissions.values.flatten().map { if (it.startsWith("ROLE_")) it else "ROLE_$it" }
 
         return Jwts.builder()
             .subject(email)
             .claim("id", id)
             .claim("roles", roles)
+            .claim("permissions", permissions)
             .issuedAt(Date())
             .expiration(Date(System.currentTimeMillis() + 1000 * 60 * 60))
             .signWith(key)
@@ -173,31 +174,31 @@ class EventControllerIntegrationTest {
     fun `should filter events by location`() {
         // Setup: Create 2 events manually in DB using IDs
         val event1 = EventEntity(
-            title = "NY Concert", description = "Loud",
-            startDate = LocalDateTime.now().plusDays(5), endDate = LocalDateTime.now().plusDays(6),
-            location = "New York", status = EventStatus.PUBLISHED,
-            organizerId = organizerId, createdBy = organizerId, updatedBy = organizerId
+            null, "NY Concert", "Loud",
+            LocalDateTime.now().plusDays(5), LocalDateTime.now().plusDays(6),
+            "New York", mutableListOf(), EventStatus.PUBLISHED,
+            organizerId, organizerId, organizerId
         )
         event1.ticketTiers.add(
             TicketTierEntity(
-                name = "VIP", price = BigDecimal("100.00"), totalAllocation = 50, availableAllocation = 50,
-                validFrom = LocalDateTime.now(), validUntil = LocalDateTime.now().plusDays(10),
-                event = event1, createdBy = organizerId, updatedBy = organizerId
+                null, "VIP", BigDecimal("100.00"), 50, 50,
+                LocalDateTime.now(), LocalDateTime.now().plusDays(10),
+                event1, organizerId, organizerId
             )
         )
         eventRepository.save(event1)
 
         val event2 = EventEntity(
-            title = "London Theatre", description = "Quiet",
-            startDate = LocalDateTime.now().plusDays(5), endDate = LocalDateTime.now().plusDays(6),
-            location = "London", status = EventStatus.PUBLISHED,
-            organizerId = organizerId, createdBy = organizerId, updatedBy = organizerId
+            null, "London Theatre", "Quiet",
+            LocalDateTime.now().plusDays(5), LocalDateTime.now().plusDays(6),
+            "London", mutableListOf(), EventStatus.PUBLISHED,
+            organizerId, organizerId, organizerId
         )
         event2.ticketTiers.add(
             TicketTierEntity(
-                name = "General", price = BigDecimal("50.00"), totalAllocation = 50, availableAllocation = 50,
-                validFrom = LocalDateTime.now(), validUntil = LocalDateTime.now().plusDays(10),
-                event = event2, createdBy = organizerId, updatedBy = organizerId
+                null, "General", BigDecimal("50.00"), 50, 50,
+                LocalDateTime.now(), LocalDateTime.now().plusDays(10),
+                event2, organizerId, organizerId
             )
         )
         eventRepository.save(event2)
@@ -216,10 +217,10 @@ class EventControllerIntegrationTest {
     fun `organizer should update their own event successfully`() {
         // 1. Create Event
         var event = EventEntity(
-            title = "Old Title", description = "Desc",
-            startDate = LocalDateTime.now().plusDays(5), endDate = LocalDateTime.now().plusDays(6),
-            location = "Home", status = EventStatus.PUBLISHED,
-            organizerId = organizerId, createdBy = organizerId, updatedBy = organizerId
+            null, "Old Title", "Desc",
+            LocalDateTime.now().plusDays(5), LocalDateTime.now().plusDays(6),
+            "Home", mutableListOf(), EventStatus.PUBLISHED,
+            organizerId, organizerId, organizerId
         )
         event = eventRepository.save(event)
 
@@ -243,10 +244,10 @@ class EventControllerIntegrationTest {
     fun `should prevent one organizer from updating another organizer's event`() {
         // 1. Org1 creates event
         var event = EventEntity(
-            title = "Org1 Event", description = "Desc",
-            startDate = LocalDateTime.now().plusDays(5), endDate = LocalDateTime.now().plusDays(6),
-            location = "Home", status = EventStatus.PUBLISHED,
-            organizerId = organizerId, createdBy = organizerId, updatedBy = organizerId
+            null, "Org1 Event", "Desc",
+            LocalDateTime.now().plusDays(5), LocalDateTime.now().plusDays(6),
+            "Home", mutableListOf(), EventStatus.PUBLISHED,
+            organizerId, organizerId, organizerId
         )
         event = eventRepository.save(event)
 
@@ -270,14 +271,10 @@ class EventControllerIntegrationTest {
     fun `admin should be able to soft delete any event`() {
         // 1. Org creates event
         var event = EventEntity(
-            title = "To Be Deleted", description = "Desc",
-            startDate = LocalDateTime.now().plusDays(5),
-            endDate = LocalDateTime.now().plusDays(6),
-            location = "Home",
-            status = EventStatus.PUBLISHED,
-            organizerId = organizerId,
-            createdBy = organizerId,
-            updatedBy = organizerId
+            null, "To Be Deleted", "Desc",
+            LocalDateTime.now().plusDays(5), LocalDateTime.now().plusDays(6),
+            "Home", mutableListOf(), EventStatus.PUBLISHED,
+            organizerId, organizerId, organizerId
         )
         event = eventRepository.save(event)
 

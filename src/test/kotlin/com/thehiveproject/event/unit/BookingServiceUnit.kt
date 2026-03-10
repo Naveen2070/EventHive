@@ -19,6 +19,7 @@ import com.thehiveproject.event.infrastructure.persistence.event.TicketTierRepos
 import com.thehiveproject.event.infrastructure.security.JwtService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
@@ -26,6 +27,8 @@ import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.context.SecurityContextHolder
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.*
@@ -57,10 +60,17 @@ class BookingServiceUnitTest {
     // --- Helpers ---
     private val userId = 1L
     private val organizerId = 100L
-    private val userToken = "valid-user-token"
     private val userEmail = "fan@test.com"
 
     private val mockOrganizer = UserSummaryDTO(organizerId, "Test Organizer", "org@test.com")
+
+    @BeforeEach
+    fun setupSecurityContext() {
+        val auth = UsernamePasswordAuthenticationToken(userEmail, userId, emptyList())
+        val context = SecurityContextHolder.createEmptyContext()
+        context.authentication = auth
+        SecurityContextHolder.setContext(context)
+    }
 
     private fun createEvent() = EventEntity(
         id = 100L,
@@ -97,10 +107,6 @@ class BookingServiceUnitTest {
         val tier = createTier(event, seats = 10)
         val request = CreateBookingRequest(eventId = 100L, ticketTierId = 50L, ticketsCount = 2)
 
-        // Mock JWT
-        whenever(jwtService.extractUserId(userToken)).thenReturn(userId)
-        whenever(jwtService.extractUsername(userToken)).thenReturn(userEmail)
-
         whenever(eventRepository.findById(100L)).thenReturn(Optional.of(event))
         whenever(ticketTierRepository.findById(50L)).thenReturn(Optional.of(tier))
 
@@ -114,7 +120,7 @@ class BookingServiceUnitTest {
         }
 
         // 2. Execute
-        val result = bookingService.createBooking(request, userToken)
+        val result = bookingService.createBooking(request, userId)
 
         // 3. Assert
         assertEquals(2, result.ticketsCount)
@@ -135,14 +141,12 @@ class BookingServiceUnitTest {
         val tier = createTier(event, seats = 2)
         val request = CreateBookingRequest(eventId = 100L, ticketTierId = 50L, ticketsCount = 5)
 
-        whenever(jwtService.extractUserId(userToken)).thenReturn(userId)
-        whenever(jwtService.extractUsername(userToken)).thenReturn(userEmail)
         whenever(eventRepository.findById(100L)).thenReturn(Optional.of(event))
         whenever(ticketTierRepository.findById(50L)).thenReturn(Optional.of(tier))
 
         // Execute & Assert
         assertThrows(InsufficientSeatsException::class.java) {
-            bookingService.createBooking(request, userToken)
+            bookingService.createBooking(request, userId)
         }
 
         verify(bookingRepository, never()).save(any())
@@ -171,12 +175,8 @@ class BookingServiceUnitTest {
         whenever(bookingRepository.findById(1L)).thenReturn(Optional.of(booking))
         whenever(bookingRepository.save(any<BookingEntity>())).thenAnswer { it.arguments[0] }
 
-        // Mock Role Checks (Not Admin)
-        whenever(jwtService.hasAnyRole(eq(userToken), anyVararg())).thenReturn(false)
-        whenever(jwtService.extractUserId(userToken)).thenReturn(userId) // Owns the booking
-
         // 2. Execute
-        bookingService.updateBookingStatus(1L, BookingStatus.CANCELLED, userToken)
+        bookingService.updateBookingStatus(1L, BookingStatus.CANCELLED, userId)
 
         // 3. Assert: Tier Seats should increase (5 + 2 = 7)
         verify(ticketTierRepository).save(check { savedTier ->
@@ -206,13 +206,10 @@ class BookingServiceUnitTest {
         )
 
         whenever(bookingRepository.findById(1L)).thenReturn(Optional.of(booking))
-        // Mock Not Admin
-        whenever(jwtService.hasAnyRole(eq(userToken), anyVararg())).thenReturn(false)
-        whenever(jwtService.extractUserId(userToken)).thenReturn(userId)
 
         // Execute
         assertThrows(ResourceAccessDeniedException::class.java) {
-            bookingService.updateBookingStatus(1L, BookingStatus.CONFIRMED, userToken)
+            bookingService.updateBookingStatus(1L, BookingStatus.CONFIRMED, userId)
         }
     }
 

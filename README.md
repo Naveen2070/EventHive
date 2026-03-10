@@ -1,24 +1,53 @@
-# Hive-Event (Core API) - Event & Booking Engine 🐝
+<p align="center">
+<img src="https://raw.githubusercontent.com/Naveen2070/The-Hive-Project/main/assets/hive-event-logo.png" alt="Hive Event Logo" width="150"/>
+</p>
 
-> The high-performance, concurrency-safe core microservice for managing events, multi-tier ticketing, and live attendee check-ins, built with **Kotlin** and **Spring Boot 3**.
+<h1 align="center">Hive-Event (Core API)</h1>
 
-Hive-Event is the central domain engine of the Hive platform. Operating within a microservices architecture, it delegates authentication to the `Hive-Identity` service while focusing entirely on the event lifecycle. It features complex ticket tiering, a high-performance booking engine with optimistic locking to prevent overselling, and asynchronous event-driven notifications via RabbitMQ.
+<p align="center"><em>The high-performance, concurrency-safe core microservice for managing events, multi-tier ticketing, and live attendee check-ins.</em></p>
+
+<p align="center">
+<img src="https://img.shields.io/badge/Language-Kotlin-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin"/>
+<img src="https://img.shields.io/badge/Framework-Spring_Boot_3-6DB33F?logo=springboot&logoColor=white" alt="Spring Boot 3"/>
+<img src="https://img.shields.io/badge/Database-PostgreSQL-336791?logo=postgresql&logoColor=white" alt="PostgreSQL"/>
+<img src="https://img.shields.io/badge/Messaging-RabbitMQ-FF6600?logo=rabbitmq&logoColor=white" alt="RabbitMQ"/>
+<img src="https://img.shields.io/badge/Security-JWT_+_HMAC-red" alt="Security"/>
+<img src="https://img.shields.io/badge/Rate_Limit-Bucket4j-blue" alt="Rate Limit"/>
+<img src="https://img.shields.io/badge/Containerization-Docker-2496ED?logo=docker&logoColor=white" alt="Docker"/>
+<img src="https://img.shields.io/github/license/Naveen2070/The-Hive-Project" alt="License"/>
+</p>
+
+---
+
+> **Hive-Event** is the central domain engine of the Hive platform. Built with **Kotlin** and **Spring Boot 3**, it
+> handles the complex lifecycle of events—from creation and multi-tier ticketing to high-concurrency booking and live
+> check-ins. It is designed to be resilient, secure, and event-driven.
 
 ---
 
 ### 🔗 Associated Repositories
-* 👉 **[EventHive UI (Frontend)](https://github.com/Naveen2070/EventHive-UI)**
+
+* 👉 **[The-Hive-Project (Main Hub)](https://github.com/Naveen2070/The-Hive-Project)**
 * 👉 **[Hive-Identity (Auth Service)](https://github.com/Naveen2070/Hive-Identity)**
+* 👉 **[Hive-Forager-UI (Frontend)](https://github.com/Naveen2070/Hive-Forager-UI)**
 
 ---
 
 ## 🚀 Key Features
 
 * **🎫 Multi-Tier Ticketing:** Support for complex event structures (e.g., "Early Bird", "VIP") with individual pricing, allocation, and validity windows.
-* **⚡ Concurrency-Safe Inventory:** Implements **Optimistic Locking** and `@Retryable` backoff's to prevent "Lost Update" problems and overselling during high-traffic ticket drops.
+* **⚡ Concurrency-Safe Inventory:** Implements **Optimistic Locking** (JPA `@Version`) and `@Retryable` backoff's to
+  prevent "Lost Update" problems and overselling during high-traffic ticket drops.
+* **🛡️ Zero-Trust Security:**
+  * **S2S Auth:** Custom interceptors generate time-sensitive **HMAC-SHA256 signatures** for secure internal data
+    fetching from the Identity Service.
+  * **Rate Limiting:** IP-based rate limiting using **Bucket4j** (20 req/min) to prevent brute-force and DDoS.
+  * **XSS Protection:** Input sanitization using **OWASP Java Encoder**.
 * **📱 Smart Check-In System:** QR-code ready endpoint handling **Date Validation** (e.g., checking a Friday pass on Saturday) and **Re-entry Logic** for multi-day events.
-* **🐇 Async Notifications (RabbitMQ):** Completely non-blocking notification architecture. Booking confirmations are published to the `hive.notifications` exchange.
-* **🛡️ Secure S2S Communication:** Uses Spring Cloud OpenFeign with custom interceptors to generate time-sensitive **HMAC-SHA256 signatures** for secure internal data fetching from the Identity Service.
+* **🐇 Async Notifications (RabbitMQ):** Completely non-blocking notification architecture. Booking confirmations are
+  published to the `hive.notifications` exchange for downstream processing.
+* **🔍 Advanced Filtering:** Robust event discovery with filtering by title, location, price range, date range, and
+  status.
 * **🗄️ Database Migrations:** Managed schema evolution using **Liquibase** (PostgreSQL compatible).
 
 ---
@@ -26,12 +55,14 @@ Hive-Event is the central domain engine of the Hive platform. Operating within a
 ## 🛠️ Tech Stack
 
 * **Language:** Kotlin (JDK 21)
-* **Framework:** Spring Boot 3+
-* **Database:** PostgreSQL
+* **Framework:** Spring Boot 3.5.10
+* **Security:** Spring Security, JWT (jjwt 0.13.0), HMAC-SHA256, Bucket4j (8.16.0)
+* **Database:** PostgreSQL 17
 * **ORM:** Spring Data JPA (Hibernate)
 * **Migration:** Liquibase
-* **Message Broker:** RabbitMQ
-* **S2S Communication:** Spring Cloud OpenFeign
+* **Messaging:** RabbitMQ (AMQP)
+* **API Documentation:** OpenAPI 3 / Swagger (SpringDoc 2.8.15)
+* **S2S Communication:** Spring Cloud OpenFeign (2025.0.1)
 * **Build Tool:** Gradle (Kotlin DSL)
 
 ---
@@ -42,155 +73,120 @@ The project follows a **Clean Architecture** approach tailored for microservices
 
 ```text
 src/main/kotlin/com/thehiveproject/event
-├── api                 # Presentation Layer (Controllers, DTOs)
-├── application         # Application Layer (Service Impl, Use Cases)
-├── domain              # Domain Layer (Business Logic, Models)
-├── infrastructure      # Infrastructure Layer (Persistence, Feign Clients, RabbitMQ Producers)
-│   └── security        # JWT Extraction & S2S HMAC Utilities
-└── configuration       # Spring Configuration (Beans, Async, RabbitMQ)
-
+├── api                 # Presentation Layer (Controllers, DTOs, Mappers)
+│   ├── controller      # REST Endpoints
+│   ├── dto             # Data Transfer Objects
+│   ├── error           # Global Exception Handling
+│   └── utils           # Security & Input Utilities
+├── application         # Application Layer (Service Implementations, Use Cases)
+├── domain              # Domain Layer (Interfaces, Domain Models, Business Logic)
+├── infrastructure      # Infrastructure Layer
+│   ├── persistence     # JPA Entities, Repositories, Projections
+│   ├── security        # JWT Filters, HMAC S2S, Rate Limiting
+│   ├── notification    # RabbitMQ Producers & Listeners
+│   └── client          # Feign Clients for Identity Service
+└── configuration       # Spring Configuration (Beans, RabbitMQ, Security)
 ```
----
-Here is the updated section. I have added a prominent warning block right at the top, added `Hive-Identity` to the prerequisites, and gently corrected the syntax in your `.env` snippet (environment files use `=` instead of `:`).
-
-I also added a quick note in the Manual Run section to remind developers to spin up RabbitMQ alongside the database!
 
 ---
 
 ## ⚙️ Getting Started (How to Run)
 
 > ⚠️ **IMPORTANT: Microservice Dependency**
-> Hive-Event is a dependent microservice. It relies entirely on the **[Hive-Identity](https://github.com/Naveen2070/Hive-Identity)** service for JWT authentication, user registration, and S2S user data hydration. To test the full application flow, you must have the Identity Service running simultaneously.
-
-The application is fully containerized using a multi-stage Dockerfile that builds a lightweight Alpine Linux image running JDK 21 under a secure, non-root `eventhive` user.
+> Hive-Event is a dependent microservice. It relies on the *
+*[Hive-Identity](https://github.com/Naveen2070/Hive-Identity)** service for JWT authentication and S2S user data
+> hydration. To test the full application flow, you must have the Identity Service running simultaneously.
 
 ### Prerequisites
 
 * **Java 21** (for manual runs)
 * **Docker & Docker Compose**
-* **Git**
-* **Hive-Identity Service** (running locally or via Docker)
+* **RabbitMQ**
+* **PostgreSQL**
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/Naveen2070/EventHive.git
-cd EventHive
+git clone https://github.com/Naveen2070/The-Hive-Project.git
+cd The-Hive-Project/services/core-api
 ```
 
 ### 2. Environment Variables (`.env`)
 
-Before running the application, create a `.env` file in the root directory. The `docker-compose.yml` expects these variables to configure the `prod` profile:
+Before running, ensure your environment is configured (or use the main project's `.env`):
 
 ```ini
 # Database
 DB_USERNAME=admin
-DB_PASSWORD=password
+DB_PASSWORD=SuperSecretPassword123!
 
-# JWT Security (Must exactly match the Identity Service secret)
+# JWT Security
 JWT_SECRET=your_super_secret_jwt_key_here
-JWT_EXPIRATION_MS=86400000
 
-# RabbitMQ Config
-RABBITMQ_HOST=hive-rabbitmq
-RABBITMQ_PORT=5672
-RABBITMQ_USERNAME=guest
-RABBITMQ_PASSWORD=guest
-RABBITMQ_VHOST=/
-
-# Identity Service S2S Config (Must match Identity Service exactly)
-INTERNAL_SHARED_SECRET=your_super_secret_shared_key
+# Zero-Trust S2S Config
+INTERNAL_SHARED_SECRET=your_s2s_shared_key
 IDENTITY_SERVICE_URL=http://identity-service:8081
 ```
 
-### 3. Run via Docker Compose (Recommended)
-
-This method spins up a PostgreSQL 17.7-alpine database and your application simultaneously. The application waits for the database health check to pass before starting.
-
-*(Note: In a full local testing setup, you would typically run a unified `docker-compose.yml` that includes the Identity Service, Core API, API Gateway, and RabbitMQ).*
+### 3. Run via Docker Compose
 
 ```bash
-# Build and start the containers in detached mode
 docker-compose up --build -d
 ```
 
-* The API will be available at `http://localhost:8080`.
-* The PostgreSQL database is exposed on port `5432`.
-
-To view the logs:
-
-```bash
-docker-compose logs -f app
-```
-
-### 4. Run Manually (Local Development)
-
-If you prefer to run the Spring Boot application directly on your host machine for debugging:
-
-**Step A: Spin up the infrastructure (Database & RabbitMQ)**
-
-```bash
-docker run --name eventhive-db -e POSTGRES_USER=admin -e POSTGRES_PASSWORD=password -e POSTGRES_DB=eventhive -p 5432:5432 -d postgres:17.7-alpine
-docker run --name hive-rabbitmq -p 5672:5672 -p 15672:15672 -d rabbitmq:3-management
-```
-
-**Step B: Run the application via Gradle**
-Ensure your local `application-dev.properties` points to `localhost:5432` for Postgres, `localhost:5672` for RabbitMQ, and `localhost:8081` for the `IDENTITY_SERVICE_URL`. Then run:
-
-```bash
-./gradlew bootRun
-```
-
-*Liquibase will automatically migrate the schema on startup.*
-
 ---
-## 🔌 API Endpoints
 
-*(Note: All endpoints require a valid JWT issued by the `Hive-Identity` service).*
+## 🔌 API Endpoints
 
 ### 📊 Dashboard
 | Method | Endpoint                | Description                                  | Access       |
 |--------|-------------------------|----------------------------------------------|--------------|
 | `GET`  | `/api/dashboard/stats`  | Get organizer revenue and ticket stats       | `ORGANIZER`+ |
 
-### 🎫 Events & Ticket Tiers
+### 🎫 Events
+
+| Method   | Endpoint                  | Description                                      | Access       |
+|----------|---------------------------|--------------------------------------------------|--------------|
+| `GET`    | `/api/events`             | Browse events (Filters: title, price, date, etc) | Public       |
+| `GET`    | `/api/events/{id}`        | Get event details with ticket tiers              | Public       |
+| `GET`    | `/api/events/organizer`   | Get events created by current organizer          | `ORGANIZER`  |
+| `POST`   | `/api/events`             | Create a new event                               | `ORGANIZER`+ |
+| `PUT`    | `/api/events/{id}`        | Update event details                             | `ORGANIZER`+ |
+| `PATCH`  | `/api/events/status/{id}` | Change event status (DRAFT, PUBLISHED, etc)      | `ORGANIZER`+ |
+| `DELETE` | `/api/events/{id}`        | Soft delete an event                             | `ORGANIZER`+ |
+
+### 🏷️ Ticket Tiers
+
 | Method   | Endpoint                      | Description                           | Access       |
 |----------|-------------------------------|---------------------------------------|--------------|
-| `GET`    | `/api/events`                 | Browse events (includes tiers)        | Public       |
-| `GET`    | `/api/events/{id}`            | Get event details                     | Public       |
-| `POST`   | `/api/events`                 | Create event (with initial tiers)     | `ORGANIZER`+ |
-| `PUT`    | `/api/events/{id}`            | Update event details                  | `ORGANIZER`+ |
-| `PATCH`  | `/api/events/status/{id}`     | Change event status (Draft/Published) | `ORGANIZER`+ |
-| `DELETE` | `/api/events/{id}`            | Soft delete an event                  | `ORGANIZER`+ |
 | `POST`   | `/api/tiers/events/{eventId}` | Add a new ticket tier to an event     | `ORGANIZER`+ |
 | `GET`    | `/api/tiers/{tierId}`         | Get ticket tier details               | Auth         |
-| `PUT`    | `/api/tiers/{tierId}`         | Update tier (price/allocation)        | `ORGANIZER`+ |
-| `DELETE` | `/api/tiers/{tierId}`         | Delete ticket tier (if no sales)      | `ORGANIZER`+ |
+| `PUT`    | `/api/tiers/{tierId}`         | Update price or allocation            | `ORGANIZER`+ |
+| `DELETE` | `/api/tiers/{tierId}`         | Delete tier (only if no tickets sold) | `ORGANIZER`+ |
 
 ### 🎟️ Bookings (Concurrency Safe)
-| Method  | Endpoint                        | Description                                  | Access          |
-|---------|---------------------------------|----------------------------------------------|-----------------|
-| `POST`  | `/api/bookings`                 | Create a booking (specifying `ticketTierId`) | Auth            |
-| `GET`   | `/api/bookings`                 | Get my bookings                              | Auth            |
-| `PATCH` | `/api/bookings/status/{id}`     | Cancel/update booking status                 | Auth            |
-| `POST`  | `/api/bookings/webhook/payment` | Payment provider webhook                     | Public (Signed) |
 
-### 📱 Organizer Tools (Scanner)
-| Method | Endpoint                 | Description                                  | Access       |
-|--------|--------------------------|----------------------------------------------|--------------|
-| `GET`  | `/api/events/organizer`  | Get events created by me                     | `ORGANIZER`  |
-| `POST` | `/api/bookings/check-in` | **Smart Check-in** (Validates Date/Re-entry) | `ORGANIZER`+ |
+| Method  | Endpoint                        | Description                                  | Access       |
+|---------|---------------------------------|----------------------------------------------|--------------|
+| `POST`  | `/api/bookings`                 | Create a booking (Atomic seat lock)          | Auth         |
+| `GET`   | `/api/bookings`                 | Get authenticated user's bookings            | Auth         |
+| `PATCH` | `/api/bookings/status/{id}`     | Cancel booking                               | Auth         |
+| `POST`  | `/api/bookings/webhook/payment` | Async payment confirmation webhook           | Public       |
+| `POST`  | `/api/bookings/check-in`        | **Smart Check-in** (Validates Date/Re-entry) | `ORGANIZER`+ |
 
 ---
 
 ## 🧪 Testing Concurrency
 
-The booking system is designed to handle race conditions on specific **Ticket Tiers**.
+The booking system handles race conditions on ticket allocations using JPA Optimistic Locking.
 
-1. Create an event with a tier having `available_allocation = 1`.
+1. Create a ticket tier with `allocation = 1`.
 2. Send two simultaneous requests to `/api/bookings`.
-3. **Result:** One succeeds, the other automatically retries and fails gracefully with "Insufficient Seats".
+3. One will succeed; the other will receive a `409 Conflict` or fail after retries.
 
 ---
 
-**Built with ❤️ by naveen**
+<p align="center">
+Built with ❤️, ☕, and distributed systems experiments.🧪<br>
+<b>Architected and maintained by <a href="https://github.com/Naveen2070">Naveen</a></b>
+</p>

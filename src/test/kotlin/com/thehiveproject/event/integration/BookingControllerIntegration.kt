@@ -2,11 +2,7 @@ package com.thehiveproject.event.integration
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.thehiveproject.event.TestcontainersConfiguration
-import com.thehiveproject.event.api.dto.BookingDTO
-import com.thehiveproject.event.api.dto.CreateBookingRequest
-import com.thehiveproject.event.api.dto.PaymentWebhookPayload
-import com.thehiveproject.event.api.dto.UpdateBookingStatusRequest
-import com.thehiveproject.event.api.dto.UserSummaryDTO
+import com.thehiveproject.event.api.dto.*
 import com.thehiveproject.event.domain.booking.BookingStatus
 import com.thehiveproject.event.domain.event.EventStatus
 import com.thehiveproject.event.infrastructure.persistence.booking.BookingRepository
@@ -38,7 +34,7 @@ import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import java.math.BigDecimal
 import java.time.LocalDateTime
-import java.util.Date
+import java.util.*
 import javax.crypto.SecretKey
 
 @ActiveProfiles("test")
@@ -94,48 +90,40 @@ class BookingControllerIntegrationTest {
 
         // 3. Create Event
         var event = EventEntity(
-            title = "Rock Concert",
-            description = "Live",
-            startDate = LocalDateTime.now().plusDays(5),
-            endDate = LocalDateTime.now().plusDays(6),
-            location = "Stadium",
-            organizerId = organizerId,
-            status = EventStatus.PUBLISHED,
-            createdBy = organizerId,
-            updatedBy = organizerId
+            null, "Rock Concert", "Live",
+            LocalDateTime.now().plusDays(5), LocalDateTime.now().plusDays(6),
+            "Stadium", mutableListOf(), EventStatus.PUBLISHED,
+            organizerId, organizerId, organizerId
         )
         event = eventRepository.save(event)
         eventId = event.id!!
 
         // 4. Create Ticket Tier
         var ticketTier = TicketTierEntity(
-            name = "General",
-            price = BigDecimal(100),
-            totalAllocation = 10,
-            availableAllocation = 10,
-            validFrom = LocalDateTime.now(),
-            validUntil = LocalDateTime.now().plusDays(10),
-            event = event,
-            createdBy = organizerId,
-            updatedBy = organizerId
+            null, "General", BigDecimal(100), 10, 10,
+            LocalDateTime.now(), LocalDateTime.now().plusDays(10),
+            event, organizerId, organizerId
         )
         ticketTier = ticketTierRepository.save(ticketTier)
         ticketTierId = ticketTier.id!!
 
-        // 5. Generate Tokens (Stateless - No DB insert needed!)
-        userToken = generateTestToken(userId, "fan@test.com", listOf("ROLE_USER"))
-        adminToken = generateTestToken(adminId, "admin@test.com", listOf("ROLE_ADMIN"))
+        // 5. Generate Tokens
+        userToken = generateTestToken(userId, "fan@test.com", mapOf("events" to listOf("USER")))
+        adminToken = generateTestToken(adminId, "admin@test.com", mapOf("events" to listOf("ADMIN")))
     }
 
-    // Helper to generate a valid JWT for testing
-    private fun generateTestToken(id: Long, email: String, roles: List<String>): String {
+    private fun generateTestToken(id: Long, email: String, permissions: Map<String, List<String>>): String {
         val keyBytes = Decoders.BASE64.decode(jwtSecret)
         val key: SecretKey = Keys.hmacShaKeyFor(keyBytes)
+
+        // Extract flattened roles for legacy 'roles' claim
+        val roles = permissions.values.flatten().map { if (it.startsWith("ROLE_")) it else "ROLE_$it" }
 
         return Jwts.builder()
             .subject(email)
             .claim("id", id)
             .claim("roles", roles)
+            .claim("permissions", permissions)
             .issuedAt(Date())
             .expiration(Date(System.currentTimeMillis() + 1000 * 60 * 60))
             .signWith(key)
