@@ -62,6 +62,32 @@ Join table entity for User-Role relationship with Domain support.
 | `role`   | `Role`   | Reference to Role                                     |
 | `domain` | `String` | Specific domain this role applies to (e.g., "events") |
 
+### `RefreshToken`
+
+_Package: `com.thehiveproject.identity_service.auth.entity`_
+
+Used for issuing new access tokens without re-authentication.
+
+| Field        | Type      | Description                |
+|:-------------|:----------|:---------------------------|
+| `id`         | `Long?`   | Primary Key (TSID)         |
+| `user`       | `User`    | Reference to User          |
+| `token`      | `String`  | Unique refresh token UUID  |
+| `expiryDate` | `Instant` | Expiration timestamp       |
+
+### `PasswordResetToken`
+
+_Package: `com.thehiveproject.identity_service.auth.entity`_
+
+Temporary token for secure password recovery.
+
+| Field        | Type      | Description                |
+|:-------------|:----------|:---------------------------|
+| `id`         | `Long?`   | Primary Key (TSID)         |
+| `user`       | `User`    | Reference to User          |
+| `token`      | `String`  | Unique reset token UUID    |
+| `expiryDate` | `Instant` | Expiration timestamp       |
+
 ---
 
 ## 2. Data Transfer Objects (DTOs)
@@ -100,6 +126,31 @@ Payload for user registration or admin creation.
 | `password`    | `String`              | User's password (min 8 chars)                                  |
 | `domainRoles` | `Map<String, String>` | Map of domains to requested roles (e.g., `{"events": "USER"}`) |
 
+#### `ForgotPasswordRequest`
+
+Request to initiate password recovery.
+
+| Field   | Type     | Description                    |
+|:--------|:---------|:-------------------------------|
+| `email` | `String` | Email address of the account   |
+
+#### `ResetPasswordRequest`
+
+Payload to complete password recovery.
+
+| Field         | Type     | Description                    |
+|:--------------|:---------|:-------------------------------|
+| `token`       | `String` | Reset token received via email |
+| `newPassword` | `String` | New password (min 8 chars)     |
+
+#### `TokenRefreshRequest`
+
+Request for a new access token using a refresh token.
+
+| Field          | Type     | Description                   |
+|:---------------|:---------|:------------------------------|
+| `refreshToken` | `String` | The valid refresh token UUID  |
+
 ---
 
 ### User DTOs
@@ -133,3 +184,90 @@ Comprehensive DTO containing full entity state.
 |:-----------|:----------|:------------------|
 | `roleName` | `String?` | Role name         |
 | `domain`   | `String?` | Associated domain |
+
+#### `UserSummary`
+
+Lightweight user identification.
+
+| Field      | Type     | Description      |
+|:-----------|:---------|:-----------------|
+| `id`       | `Long`   | User ID (TSID)   |
+| `fullName` | `String` | User's full name |
+| `email`    | `String` | User's email     |
+
+#### `UpdateProfileRequest`
+
+Payload for updating user profile details.
+
+| Field      | Type      | Description      |
+|:-----------|:----------|:-----------------|
+| `fullName` | `String?` | User's full name |
+
+#### `ChangePasswordRequest`
+
+Payload for changing authenticated user's password.
+
+| Field         | Type     | Description      |
+|:--------------|:---------|:-----------------|
+| `oldPassword` | `String` | Current password |
+| `newPassword` | `String` | New password     |
+
+---
+
+### Common DTOs
+
+#### `PaginatedResponse<T>`
+
+Generic wrapper for paginated lists.
+
+| Field           | Type      | Description                     |
+|:----------------|:----------|:--------------------------------|
+| `content`       | `List<T>` | List of items for current page  |
+| `page`          | `Int`     | Current page index (0-based)    |
+| `size`          | `Int`     | Page size                       |
+| `totalElements` | `Long`    | Total number of records         |
+| `totalPages`    | `Int`     | Total number of pages           |
+| `isLast`        | `Boolean` | Whether this is the last page   |
+
+#### `ApiErrorResponse`
+
+Standard error structure for all failed requests.
+
+| Field       | Type            | Description                   |
+|:------------|:----------------|:------------------------------|
+| `timestamp` | `LocalDateTime` | When the error occurred       |
+| `status`    | `Int`           | HTTP status code              |
+| `error`     | `String`        | HTTP status reason            |
+| `message`   | `String`        | Detailed error message        |
+| `path`      | `String`        | Endpoint where error occurred |
+
+---
+
+## 3. Token Claim Structure
+
+The Identity Service issues JWT access tokens with a multi-tenant permission model.
+
+### Standard Claims
+
+| Claim | Description |
+|:------|:------------|
+| `sub` | User Email  |
+| `iat` | Issued At   |
+| `exp` | Expiration  |
+
+### Custom Claims
+
+| Claim         | Type                        | Description                                        |
+|:--------------|:----------------------------|:---------------------------------------------------|
+| `id`          | `Long`                      | User unique identifier (TSID)                      |
+| `email`       | `String`                    | Redundant email claim for convenience              |
+| `domains`     | `List<String>`              | List of domains the user has access to             |
+| `permissions` | `Map<String, List<String>>` | Map of domains to list of roles (e.g. `ROLE_USER`) |
+
+Example `permissions` claim:
+```json
+{
+  "events": ["ROLE_ORGANIZER", "ROLE_USER"],
+  "admin": ["ROLE_ADMIN"]
+}
+```
