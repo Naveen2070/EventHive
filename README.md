@@ -69,7 +69,149 @@
 
 ## 🏗️ Architecture
 
-The project follows a **Clean Architecture** approach tailored for microservices:
+The project follows a **Clean Architecture** approach tailored for microservices. Below are the structural diagrams of the Hive-Event engine.
+
+### High-Level Ecosystem
+
+```mermaid
+flowchart TB
+
+classDef external fill:#f5f5f5,stroke:#9e9e9e,stroke-width:2px,color:#212121
+classDef platform fill:#e3f2fd,stroke:#64b5f6,stroke-width:2px,color:#0d47a1
+classDef core fill:#e8f5e9,stroke:#a5d6a7,stroke-width:2px,color:#1b5e20
+
+subgraph USERS ["Users"]
+    user[End User]
+    admin[Platform Admin]
+    organizer[Event Organizer]
+end
+
+subgraph HIVE ["The Hive Platform Context"]
+    frontend["Frontend Applications"]:::platform
+    gateway["Nginx API Gateway"]:::platform
+    core_api["Hive-Event (Core API)"]:::core
+    identity["Hive-Identity"]:::platform
+end
+
+subgraph EXTERNAL ["External Systems"]
+    payment["Payment Gateway"]:::external
+    email["Email Provider"]:::external
+end
+
+user --> frontend
+organizer --> frontend
+admin --> frontend
+
+frontend --> gateway
+gateway --> core_api
+gateway --> identity
+core_api -. HMAC S2S .-> identity
+core_api --> payment
+core_api --> email
+```
+
+### Container Architecture
+
+```mermaid
+flowchart TB
+    classDef edge fill:#fff3e0,stroke:#ffcc80,stroke-width:2px,color:#e65100
+    classDef core fill:#e8f5e9,stroke:#a5d6a7,stroke-width:2px,color:#1b5e20
+    classDef db fill:#eceff1,stroke:#b0bec5,stroke-width:2px,color:#263238
+    classDef broker fill:#ffebee,stroke:#ef9a9a,stroke-width:2px,color:#b71c1c
+
+    subgraph EDGE ["Edge Layer"]
+      nginx["Nginx API Gateway"]:::edge
+    end
+
+    subgraph DOCKER ["Docker Network"]
+      direction TB
+      
+      subgraph SERVICE ["Core Service"]
+        events["Hive-Event Engine (Kotlin + Spring Boot)"]:::core
+      end
+
+      subgraph PERSISTENCE ["Data Storage"]
+        postgres[(PostgreSQL 17)]:::db
+      end
+
+      subgraph MESSAGING ["Event Bus"]
+        rabbit[(RabbitMQ)]:::broker
+      end
+      
+      identity["Hive-Identity (External Dependency)"]:::core
+    end
+
+    nginx --> events
+    events --> postgres
+    events -- Publish Booking Event --> rabbit
+    events -. Feign + HMAC .-> identity
+```
+
+### Layered Architecture
+
+```mermaid
+flowchart TB
+
+classDef layer_api fill:#e3f2fd,stroke:#90caf9,stroke-width:2px,color:#0d47a1
+classDef layer_app fill:#e8f5e9,stroke:#a5d6a7,stroke-width:2px,color:#1b5e20
+classDef layer_dom fill:#fff3e0,stroke:#ffcc80,stroke-width:2px,color:#e65100
+classDef layer_infra fill:#f3e5f5,stroke:#ce93d8,stroke-width:2px,color:#4a148c
+
+subgraph API_LAYER ["Presentation Layer (api)"]
+    ctrl[Controllers]:::layer_api
+    dto[DTOs]:::layer_api
+    mapper[Mappers]:::layer_api
+end
+
+subgraph APP_LAYER ["Application Layer (application)"]
+    svc[Service Implementations]:::layer_app
+    usecase[Use Cases]:::layer_app
+end
+
+subgraph DOMAIN_LAYER ["Domain Layer (domain)"]
+    model[Domain Models]:::layer_dom
+    repo_intf[Repository Interfaces]:::layer_dom
+    logic[Business Logic]:::layer_dom
+end
+
+subgraph INFRA_LAYER ["Infrastructure Layer (infrastructure)"]
+    repo_impl[JPA Repositories]:::layer_infra
+    feign[Identity Feign Client]:::layer_infra
+    sec[Security / HMAC Filter]:::layer_infra
+    mq[RabbitMQ Producer]:::layer_infra
+end
+
+API_LAYER --> APP_LAYER
+APP_LAYER --> DOMAIN_LAYER
+APP_LAYER --> INFRA_LAYER
+INFRA_LAYER --> DOMAIN_LAYER
+```
+
+### Zero-Trust Security Model
+
+```mermaid
+flowchart LR
+
+classDef client fill:#e3f2fd,stroke:#90caf9,stroke-width:2px,color:#0d47a1
+classDef gateway fill:#fff3e0,stroke:#ffcc80,stroke-width:2px,color:#e65100
+classDef service fill:#e8f5e9,stroke:#a5d6a7,stroke-width:2px,color:#1b5e20
+classDef security fill:#fce4ec,stroke:#f48fb1,stroke-width:2px,color:#c2185b
+
+user[User]:::client
+gateway[Nginx Gateway]:::gateway
+events[Hive-Event API]:::service
+identity[Hive-Identity]:::service
+
+user -->|1. JWT Authentication| gateway
+gateway -->|2. Propagate JWT| events
+events -->|3. Validate Token| events
+events -.->|4. HMAC-SHA256 Signature| identity
+identity -.->|5. Return User Data| events
+```
+
+---
+
+## 📂 Project Structure
 
 ```text
 src/main/kotlin/com/thehiveproject/event
