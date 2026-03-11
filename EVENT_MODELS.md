@@ -18,7 +18,7 @@ _Package: `com.thehiveproject.event.infrastructure.persistence.base`_
 Common base class for all entities, providing auditing and soft-delete capabilities.
 
 | Field       | Type       | Description                                |
-|:------------|:-----------|:-------------------------------------------|
+| :---------- | :--------- | :----------------------------------------- |
 | `createdAt` | `Instant`  | Timestamp of creation                      |
 | `updatedAt` | `Instant`  | Timestamp of last update                   |
 | `version`   | `Long`     | Optimistic locking version                 |
@@ -31,7 +31,7 @@ Common base class for all entities, providing auditing and soft-delete capabilit
 _Package: `com.thehiveproject.event.infrastructure.persistence.event`_
 
 | Field         | Type                      | Description                                          |
-|:--------------|:--------------------------|:-----------------------------------------------------|
+| :------------ | :------------------------ | :--------------------------------------------------- |
 | `id`          | `Long?`                   | Primary Key (Identity)                               |
 | `title`       | `String`                  | Event title                                          |
 | `description` | `String`                  | Detailed description                                 |
@@ -47,7 +47,7 @@ _Package: `com.thehiveproject.event.infrastructure.persistence.event`_
 _Package: `com.thehiveproject.event.infrastructure.persistence.event`_
 
 | Field                 | Type            | Description                           |
-|:----------------------|:----------------|:--------------------------------------|
+| :-------------------- | :-------------- | :------------------------------------ |
 | `id`                  | `Long?`         | Primary Key (Identity)                |
 | `name`                | `String`        | Tier name (e.g., "VIP", "General")    |
 | `price`               | `BigDecimal`    | Ticket price                          |
@@ -62,7 +62,7 @@ _Package: `com.thehiveproject.event.infrastructure.persistence.event`_
 _Package: `com.thehiveproject.event.infrastructure.persistence.booking`_
 
 | Field              | Type               | Description                                                   |
-|:-------------------|:-------------------|:--------------------------------------------------------------|
+| :----------------- | :----------------- | :------------------------------------------------------------ |
 | `id`               | `Long?`            | Primary Key (Identity)                                        |
 | `bookingReference` | `String`           | Unique alphanumeric reference                                 |
 | `userId`           | `Long`             | ID of the user who made the booking                           |
@@ -76,7 +76,42 @@ _Package: `com.thehiveproject.event.infrastructure.persistence.booking`_
 
 ---
 
-## 2. Data Transfer Objects (DTOs)
+## 2. Enums & Constants
+
+### `EventStatus`
+
+| Value       | Description                                      |
+| :---------- | :----------------------------------------------- |
+| `DRAFT`     | Event is being edited and not visible to public. |
+| `PUBLISHED` | Event is live and tickets can be booked.         |
+| `CANCELLED` | Event has been cancelled by organizer.           |
+| `COMPLETED` | Event date has passed.                           |
+
+### `BookingStatus`
+
+| Value             | Description                                      |
+| :---------------- | :----------------------------------------------- |
+| `PENDING_PAYMENT` | Initial state, waiting for payment confirmation. |
+| `CONFIRMED`       | Payment successful, booking is active.           |
+| `CANCELLED`       | Booking cancelled by user or system.             |
+| `REFUNDED`        | Payment returned to user.                        |
+| `EXPIRED`         | Payment window timed out.                        |
+| `CHECKED_IN`      | User has entered the venue.                      |
+
+### `CheckInStatus`
+
+| Value                | Description                                      |
+| :------------------- | :----------------------------------------------- |
+| `CHECKED_IN`         | Success.                                         |
+| `ALREADY_CHECKED_IN` | Ticket was already scanned.                      |
+| `EXPIRED`            | Event has already ended.                         |
+| `INVALID_STATUS`     | Booking is not in CONFIRMED state.               |
+| `WRONG_DATE`         | Ticket is for a different date.                  |
+| `NOT_AUTHORIZED`     | Scanner does not have permission for this event. |
+
+---
+
+## 3. Data Transfer Objects (DTOs)
 
 ### Event DTOs
 
@@ -85,7 +120,7 @@ _Package: `com.thehiveproject.event.infrastructure.persistence.booking`_
 _Package: `com.thehiveproject.event.api.dto`_
 
 | Field           | Type                  | Description                                |
-|:----------------|:----------------------|:-------------------------------------------|
+| :-------------- | :-------------------- | :----------------------------------------- |
 | `id`            | `Long`                | ID                                         |
 | `title`         | `String`              | Title                                      |
 | `description`   | `String`              | Description                                |
@@ -102,7 +137,7 @@ _Package: `com.thehiveproject.event.api.dto`_
 #### `CreateEventRequest`
 
 | Field            | Type                            | Description       |
-|:-----------------|:--------------------------------|:------------------|
+| :--------------- | :------------------------------ | :---------------- |
 | `title`          | `String`                        | Required          |
 | `description`    | `String`                        | Required          |
 | `startDate`      | `LocalDateTime`                 | Required          |
@@ -114,7 +149,7 @@ _Package: `com.thehiveproject.event.api.dto`_
 #### `UpdateEventRequest`
 
 | Field         | Type             | Description |
-|:--------------|:-----------------|:------------|
+| :------------ | :--------------- | :---------- |
 | `title`       | `String?`        | Optional    |
 | `description` | `String?`        | Optional    |
 | `location`    | `String?`        | Optional    |
@@ -124,7 +159,7 @@ _Package: `com.thehiveproject.event.api.dto`_
 #### `EventSearchCriteria`
 
 | Field       | Type             | Description          |
-|:------------|:-----------------|:---------------------|
+| :---------- | :--------------- | :------------------- |
 | `title`     | `String?`        | Filter by title      |
 | `location`  | `String?`        | Filter by locale     |
 | `minPrice`  | `BigDecimal?`    | Price floor          |
@@ -138,7 +173,7 @@ _Package: `com.thehiveproject.event.api.dto`_
 #### `TicketTierDTO`
 
 | Field                 | Type            | Description |
-|:----------------------|:----------------|:------------|
+| :-------------------- | :-------------- | :---------- |
 | `id`                  | `Long`          | ID          |
 | `name`                | `String`        | Name        |
 | `price`               | `BigDecimal`    | Price       |
@@ -150,7 +185,7 @@ _Package: `com.thehiveproject.event.api.dto`_
 #### `CreateTicketTierRequest`
 
 | Field             | Type            | Description |
-|:------------------|:----------------|:------------|
+| :---------------- | :-------------- | :---------- |
 | `name`            | `String`        | Required    |
 | `price`           | `BigDecimal`    | Min: 0      |
 | `totalAllocation` | `Int`           | Min: 1      |
@@ -162,7 +197,7 @@ _Package: `com.thehiveproject.event.api.dto`_
 #### `BookingDTO`
 
 | Field              | Type            | Description |
-|:-------------------|:----------------|:------------|
+| :----------------- | :-------------- | :---------- |
 | `bookingId`        | `Long`          | ID          |
 | `bookingReference` | `String`        | Ref Code    |
 | `eventId`          | `Long`          | Event ID    |
@@ -177,7 +212,7 @@ _Package: `com.thehiveproject.event.api.dto`_
 #### `CreateBookingRequest`
 
 | Field          | Type   | Description     |
-|:---------------|:-------|:----------------|
+| :------------- | :----- | :-------------- |
 | `eventId`      | `Long` | Required        |
 | `ticketTierId` | `Long` | Required        |
 | `ticketsCount` | `Int`  | Min: 1, Max: 10 |
@@ -185,7 +220,7 @@ _Package: `com.thehiveproject.event.api.dto`_
 #### `CheckInResponse`
 
 | Field            | Type            | Description         |
-|:-----------------|:----------------|:--------------------|
+| :--------------- | :-------------- | :------------------ |
 | `success`        | `Boolean`       | Success status      |
 | `status`         | `CheckInStatus` | `SUCCESS`, `FAILED` |
 | `message`        | `String`        | Status message      |
@@ -198,7 +233,7 @@ _Package: `com.thehiveproject.event.api.dto`_
 #### `DashboardStatsDTO`
 
 | Field                          | Type                     | Description |
-|:-------------------------------|:-------------------------|:------------|
+| :----------------------------- | :----------------------- | :---------- |
 | `totalRevenue`                 | `Double`                 | Total       |
 | `totalTicketsSold`             | `Long`                   | Total       |
 | `activeEvents`                 | `Long`                   | Count       |
@@ -211,7 +246,7 @@ _Package: `com.thehiveproject.event.api.dto`_
 #### `PaginatedResponse<T>`
 
 | Field           | Type      | Description   |
-|:----------------|:----------|:--------------|
+| :-------------- | :-------- | :------------ |
 | `content`       | `List<T>` | Data list     |
 | `page`          | `Int`     | Current page  |
 | `size`          | `Int`     | Page size     |
@@ -222,7 +257,7 @@ _Package: `com.thehiveproject.event.api.dto`_
 #### `UserSummaryDTO`
 
 | Field      | Type     | Description |
-|:-----------|:---------|:------------|
+| :--------- | :------- | :---------- |
 | `id`       | `Long`   | User ID     |
 | `fullName` | `String` | Full Name   |
 | `email`    | `String` | Email       |
