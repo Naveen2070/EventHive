@@ -4,8 +4,8 @@ import org.springframework.data.domain.Page
 
 data class PaginatedResponse<T>(
     val content: List<T>,
-    val page: Int,
-    val size: Int,
+    val pageNumber: Int,
+    val pageSize: Int,
     val totalElements: Long,
     val totalPages: Int,
     val isLast: Boolean
@@ -14,8 +14,8 @@ data class PaginatedResponse<T>(
 fun <T> Page<T>.toPaginatedResponse(): PaginatedResponse<T> =
     PaginatedResponse(
         content = this.content,
-        page = this.number,
-        size = this.size,
+        pageNumber = this.number,
+        pageSize = this.size,
         totalElements = this.totalElements,
         totalPages = this.totalPages,
         isLast = this.isLast
