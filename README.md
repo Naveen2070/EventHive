@@ -191,19 +191,16 @@ INFRA_LAYER --> DOMAIN_LAYER
 
 ```mermaid
 erDiagram
+    BASE_AUDITABLE_ENTITY ||--|| EVENTS : "inherits"
+    BASE_AUDITABLE_ENTITY ||--|| TICKET_TIERS : "inherits"
+    BASE_AUDITABLE_ENTITY ||--|| BOOKINGS : "inherits"
+
     EVENTS ||--o{ TICKET_TIERS : "has"
     TICKET_TIERS ||--o{ BOOKINGS : "booked in"
     EVENTS ||--o{ BOOKINGS : "belongs to"
 
-    EVENTS {
+    BASE_AUDITABLE_ENTITY {
         long id PK "Auto-increment"
-        string title "Event Title"
-        text description "Detailed Description"
-        timestamp start_date "Start Time"
-        timestamp end_date "End Time"
-        string location "Venue/Online"
-        string status "DRAFT, PUBLISHED, etc."
-        long organizer_id FK "References Identity Service User"
         long created_by FK
         long updated_by FK
         long deleted_by FK
@@ -214,8 +211,17 @@ erDiagram
         timestamp deleted_at
     }
 
+    EVENTS {
+        string title "Event Title"
+        text description "Detailed Description"
+        timestamp start_date "Start Time"
+        timestamp end_date "End Time"
+        string location "Venue/Online"
+        string status "DRAFT, PUBLISHED, etc."
+        long organizer_id FK "References Identity Service User"
+    }
+
     TICKET_TIERS {
-        long id PK "Auto-increment"
         long event_id FK "References EVENTS(id)"
         string name "Tier Name (e.g., VIP, General)"
         decimal price "Ticket Price"
@@ -224,18 +230,9 @@ erDiagram
         timestamp valid_from "Sale Start"
         timestamp valid_until "Sale End"
         long version "Optimistic Locking"
-        long created_by FK
-        long updated_by FK
-        long deleted_by FK
-        boolean is_active
-        boolean is_deleted
-        timestamp created_at
-        timestamp updated_at
-        timestamp deleted_at
     }
 
     BOOKINGS {
-        long id PK "Auto-increment"
         string booking_reference UK "Unique Reference"
         long user_id FK "References Identity Service User"
         long event_id FK "References EVENTS(id)"
@@ -245,14 +242,6 @@ erDiagram
         string status "PENDING, CONFIRMED, etc."
         timestamp last_checked_in_at "Last Entry Time"
         int check_in_count "Number of Check-ins"
-        long created_by FK
-        long updated_by FK
-        long deleted_by FK
-        boolean is_active
-        boolean is_deleted
-        timestamp created_at
-        timestamp updated_at
-        timestamp deleted_at
     }
 ```
 
